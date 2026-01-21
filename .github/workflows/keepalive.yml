@@ -1,1 +1,13 @@
+name: keepalive   # Nome do workflow
 
+on:
+  schedule:
+    - cron: '*/14 * * * *'  # roda a cada 14 minutos
+  workflow_dispatch:          # permite rodar manualmente pelo GitHub
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest   # ambiente Linux do GitHub
+    steps:
+      - name: Wake up Render
+        run: curl -s https://exlify.onrender.com
