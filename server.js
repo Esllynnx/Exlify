@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import ytdlp from "youtube-dl-exec";
 import fetch from "node-fetch";
+import path from "path";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -75,33 +76,28 @@ app.get("/api/audio", async (req, res) => {
   if (!videoId) return res.sendStatus(400);
 
   const range = req.headers.range || "bytes=0-";
-
   const clientId = req.ip;
 
   // Mata stream antigo se existir
   const old = activeStreams.get(clientId);
   if (old) {
-    try {
-      old.abortController.abort();
-    } catch {}
+    try { old.abortController.abort(); } catch {}
     activeStreams.delete(clientId);
   }
 
   try {
-    // Pega info do vídeo
-const info = await ytdlp(`https://www.youtube.com/watch?v=${videoId}`, {
-  dumpSingleJson: true,
-  noCheckCertificates: true,
-  noWarnings: true,
-  preferFreeFormats: true,
-  youtubeSkipDashManifest: true,
-  cookies: './cookies.txt', // <-- aqui
-});
-
+    // Pega info do vídeo usando cookies
+    const info = await ytdlp(`https://www.youtube.com/watch?v=${videoId}`, {
+      dumpSingleJson: true,
+      noCheckCertificates: true,
+      noWarnings: true,
+      preferFreeFormats: true,
+      cookies: path.resolve("./cookies.txt"), // Caminho absoluto
+    });
 
     const audioFormat = info.formats
-      .filter(f => f.acodec !== "none" && f.filesize)
-      .sort((a,b)=> b.filesize - a.filesize)[0];
+      .filter(f => f.acodec !== "none" && f.url)
+      .sort((a,b) => b.filesize - a.filesize)[0];
 
     if (!audioFormat || !audioFormat.url) return res.sendStatus(404);
 
@@ -142,4 +138,3 @@ const info = await ytdlp(`https://www.youtube.com/watch?v=${videoId}`, {
 // START SERVER
 // --------------------
 app.listen(PORT, "0.0.0.0", () => console.log(`Servidor rodando na porta ${PORT}`));
-
