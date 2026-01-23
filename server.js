@@ -1,51 +1,142 @@
 import express from "express";
-import fetch from "node-fetch";
 import cors from "cors";
+import ytdlp from "youtube-dl-exec";
+import fetch from "node-fetch";
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Permite que qualquer site faça requisições à sua API
+// --------------------
+// CONFIGURAÇÃO GERAL
+// --------------------
+app.disable("x-powered-by");
 app.use(cors());
+app.use(express.static("public", { maxAge: "1h", etag: true }));
 
-// Servir arquivos estáticos da pasta "public" (index.html, css, etc.)
-app.use(express.static("public"));
+// --------------------
+// CACHE DE BUSCA RÁPIDO
+// --------------------
+const searchCache = new Map();
+const SEARCH_TTL = 30_000; // 30s
 
-// Coloque sua chave da API do YouTube aqui
-const YT_KEY = "AIzaSyAW1Zm58IklfW1lYo9Wv0cwSVBsrHyiPWA"; // ⛔ NÃO compartilhe em público
-const YT_API = "https://www.googleapis.com/youtube/v3/search";
-
-// Endpoint de busca
 app.get("/api/search", async (req, res) => {
   try {
-    const q = req.query.q;
+    const q = (req.query.q || "").trim();
     if (!q) return res.json([]);
 
-    const url =
-      `${YT_API}?part=snippet&type=video&maxResults=10` +
-      `&q=${encodeURIComponent(q)}` +
-      `&key=${YT_KEY}`;
+    const cached = searchCache.get(q);
+    if (cached && Date.now() - cached.time < SEARCH_TTL) return res.json(cached.data);
 
-    const r = await fetch(url);
-    const data = await r.json();
+    const html = await fetch(
+      `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
+      { headers: { "User-Agent": "Mozilla/5.0" } }
+    ).then(r => r.text());
 
-    if (!data.items) return res.json([]);
+    const match = html.match(/var ytInitialData = (.*?);<\/script>/s);
+    if (!match) return res.json([]);
 
-    const mapped = data.items.map(v => ({
-      videoId: v.id.videoId,
-      title: v.snippet.title,
-      author: v.snippet.channelTitle,
-      thumb: v.snippet.thumbnails.medium.url
-    }));
+    const data = JSON.parse(match[1]);
+    const items =
+      data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents || [];
 
-    res.json(mapped);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json([]);
+    const results = [];
+
+    for (const item of items) {
+      const v = item.videoRenderer;
+      if (!v?.videoId) continue;
+
+      results.push({
+        videoId: v.videoId,
+        title: v.title?.runs?.[0]?.text || "",
+        author: v.ownerText?.runs?.[0]?.text || "",
+        thumb: v.thumbnail?.thumbnails?.pop()?.url || "",
+        duration: v.lengthText?.simpleText || ""
+      });
+
+      if (results.length >= 10) break;
+    }
+
+    searchCache.set(q, { time: Date.now(), data: results });
+    res.json(results);
+
+  } catch (err) {
+    console.error("Erro no /api/search:", err);
+    res.json([]);
   }
 });
 
-// Porta dinâmica para Render
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🔥 Server rodando na porta ${PORT}`);
+// --------------------
+// AUDIO STREAM COM SEEK
+// --------------------
+const activeStreams = new Map();
+
+app.get("/api/audio", async (req, res) => {
+  const videoId = req.query.v;
+  if (!videoId) return res.sendStatus(400);
+
+  const range = req.headers.range || "bytes=0-";
+
+  const clientId = req.ip;
+
+  // Mata stream antigo se existir
+  const old = activeStreams.get(clientId);
+  if (old) {
+    try {
+      old.abortController.abort();
+    } catch {}
+    activeStreams.delete(clientId);
+  }
+
+  try {
+    // Pega info do vídeo
+    const info = await ytdlp(`https://www.youtube.com/watch?v=${videoId}`, {
+      dumpSingleJson: true,
+      noCheckCertificates: true,
+      noWarnings: true,
+      preferFreeFormats: true,
+      youtubeSkipDashManifest: true,
+    });
+
+    const audioFormat = info.formats
+      .filter(f => f.acodec !== "none" && f.filesize)
+      .sort((a,b)=> b.filesize - a.filesize)[0];
+
+    if (!audioFormat || !audioFormat.url) return res.sendStatus(404);
+
+    const audioUrl = audioFormat.url;
+
+    // Cria abortController para cancelar se o usuário sair ou trocar música
+    const abortController = new AbortController();
+    activeStreams.set(clientId, { abortController });
+
+    // Faz fetch do range direto do YouTube
+    const headers = { Range: range, "User-Agent": "Mozilla/5.0" };
+    const response = await fetch(audioUrl, { headers, signal: abortController.signal });
+
+    // Repasse os headers para o navegador
+    const contentLength = response.headers.get("content-length");
+    const contentRange = response.headers.get("content-range");
+
+    if (contentLength) res.setHeader("Content-Length", contentLength);
+    if (contentRange) res.setHeader("Content-Range", contentRange);
+
+    res.setHeader("Content-Type", "audio/mp4");
+    res.setHeader("Accept-Ranges", "bytes");
+    res.setHeader("Connection", "keep-alive");
+
+    response.body.pipe(res);
+
+    // Limpeza de stream se o cliente fechar
+    response.body.on("error", () => res.end());
+    res.on("close", () => abortController.abort());
+
+  } catch (err) {
+    console.error("Erro no /api/audio:", err);
+    res.sendStatus(500);
+  }
 });
+
+// --------------------
+// START SERVER
+// --------------------
+app.listen(PORT, "0.0.0.0", () => console.log(`Servidor rodando na porta ${PORT}`));
