@@ -89,13 +89,15 @@ app.get("/api/audio", async (req, res) => {
 
   try {
     // Pega info do vídeo
-    const info = await ytdlp(`https://www.youtube.com/watch?v=${videoId}`, {
-      dumpSingleJson: true,
-      noCheckCertificates: true,
-      noWarnings: true,
-      preferFreeFormats: true,
-      youtubeSkipDashManifest: true,
-    });
+const info = await ytdlp(`https://www.youtube.com/watch?v=${videoId}`, {
+  dumpSingleJson: true,
+  noCheckCertificates: true,
+  noWarnings: true,
+  preferFreeFormats: true,
+  youtubeSkipDashManifest: true,
+  cookies: './cookies.txt', // <-- aqui
+});
+
 
     const audioFormat = info.formats
       .filter(f => f.acodec !== "none" && f.filesize)
@@ -140,3 +142,4 @@ app.get("/api/audio", async (req, res) => {
 // START SERVER
 // --------------------
 app.listen(PORT, "0.0.0.0", () => console.log(`Servidor rodando na porta ${PORT}`));
+
