@@ -494,7 +494,7 @@
           padding: 16px; 
           margin: 0; 
           border-radius: 0; 
-          padding-bottom: 200px; 
+          padding-bottom: 150%; 
           height: auto;
           overflow: visible;
       }
