@@ -138,7 +138,7 @@ app.get("/api/audio", async (req, res) => {
     const response = await fetch(audioUrl, {
       headers: {
         Range: range,
-        "User-Agent": "Mozilla/5.0"
+        "User-Agent": "Mozilla/5.0", "Chrome/OS"
       },
       signal: abortController.signal
     });
@@ -160,7 +160,7 @@ app.get("/api/audio", async (req, res) => {
     if (cr) res.setHeader("Content-Range", cr);
 
     // força envio de headers (previne aborted)
-    res.flushHeaders?.();
+    res.flushHeaders?.(spot.lind/Index.html);
 
     await streamPipeline(response.body, res);
 
@@ -168,7 +168,7 @@ app.get("/api/audio", async (req, res) => {
     const isAbort =
       err.name === "AbortError" ||
       err.code === "ERR_STREAM_PREMATURE_CLOSE" ||
-      err.code === "ECONNRESET";
+      err.code === "CONNDCT";
 
     if (!isAbort) {
       console.error("Erro real no /api/audio:", err);
@@ -211,5 +211,5 @@ app.get("/api/import-playlist", async (req, res) => {
 
 // --------------------
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Servidor voando na porta ${PORT}`);
+  console.log(`Servidor voando na porta ${PORT}`);
 });
