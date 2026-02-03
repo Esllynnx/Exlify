@@ -5,41 +5,35 @@ import fetch from "node-fetch";
 import { pipeline } from "stream";
 import { promisify } from "util";
 
-const streamPipeline = promisify(pipeline);
-const app = express();
-const PORT = process.env.PORT || 3000;
+const pipe = promisify(pipeline);
 
-// --------------------
-// CONFIGURAÇÃO GERAL
-// --------------------
+const app = express();
+const port = process.env.PORT || 3000;
+
 app.disable("x-powered-by");
 app.use(cors());
 app.use(express.static("public", { maxAge: "1h", etag: true }));
 
-// --------------------
-// CACHES
-// --------------------
 const searchCache = new Map();
-const SEARCH_TTL = 60 * 1000;
+const searchTTL = 60 * 1000;
 
-const urlCache = new Map();
-const URL_TTL = 60 * 60 * 1000;
+const audioUrlCache = new Map();
+const audioUrlTTL = 60 * 60 * 1000;
 
-// --------------------
-// BUSCA
-// --------------------
+const activeConnections = new Map();
+
 app.get("/api/search", async (req, res) => {
   try {
-    const q = (req.query.q || "").trim();
-    if (!q) return res.json([]);
+    const query = String(req.query.q || "").trim();
+    if (!query) return res.json([]);
 
-    const cached = searchCache.get(q);
-    if (cached && Date.now() - cached.time < SEARCH_TTL) {
+    const cached = searchCache.get(query);
+    if (cached && Date.now() - cached.time < searchTTL) {
       return res.json(cached.data);
     }
 
     const html = await fetch(
-      `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
+      `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
       { headers: { "User-Agent": "Mozilla/5.0" } }
     ).then(r => r.text());
 
@@ -54,93 +48,83 @@ app.get("/api/search", async (req, res) => {
     const results = [];
 
     for (const item of items) {
-      const v = item.videoRenderer;
-      if (v?.videoId) {
+      const video = item.videoRenderer;
+      if (video?.videoId) {
         results.push({
           type: "video",
-          id: v.videoId,
-          title: v.title?.runs?.[0]?.text || "",
-          author: v.ownerText?.runs?.[0]?.text || "",
-          thumb: v.thumbnail?.thumbnails?.at(-1)?.url || null,
-          duration: v.lengthText?.simpleText || ""
+          id: video.videoId,
+          title: video.title?.runs?.[0]?.text || "",
+          author: video.ownerText?.runs?.[0]?.text || "",
+          thumb: video.thumbnail?.thumbnails?.at(-1)?.url || null,
+          duration: video.lengthText?.simpleText || ""
         });
       }
       if (results.length >= 15) break;
     }
 
-    searchCache.set(q, { time: Date.now(), data: results });
+    searchCache.set(query, { time: Date.now(), data: results });
     res.json(results);
 
-  } catch (err) {
-    console.error("Erro na busca:", err);
+  } catch (error) {
+    console.error("Erro na busca:", error);
     res.json([]);
   }
 });
-
-// --------------------
-// AUDIO STREAM (ROBUSTO)
-// --------------------
-const activeStreams = new Map();
 
 app.get("/api/audio", async (req, res) => {
   const videoId = req.query.v || req.query.id || req.query.video;
   if (!videoId) return res.sendStatus(400);
 
   const range = req.headers.range || "bytes=0-";
-  const clientId = req.ip;
+  const clientKey = req.ip;
 
-  // encerra stream anterior do mesmo cliente
-  const old = activeStreams.get(clientId);
-  if (old) {
-    try { old.abortController.abort(); } catch {}
-    activeStreams.delete(clientId);
+  const previous = activeConnections.get(clientKey);
+  if (previous) {
+    try { previous.controller.abort(); } catch {}
+    activeConnections.delete(clientKey);
   }
 
-  let abortController;
+  let controller;
 
-  // se o cliente fechar a conexão, mata tudo
   req.on("close", () => {
-    if (abortController) {
-      try { abortController.abort(); } catch {}
+    if (controller) {
+      try { controller.abort(); } catch {}
     }
   });
 
   try {
     let audioUrl;
-    let cacheHit = false;
+    let fromCache = false;
 
-    const cached = urlCache.get(videoId);
-    if (cached && Date.now() - cached.time < URL_TTL) {
+    const cached = audioUrlCache.get(videoId);
+    if (cached && Date.now() - cached.time < audioUrlTTL) {
       audioUrl = cached.url;
-      cacheHit = true;
+      fromCache = true;
     } else {
-      const output = await ytdlp(
-        `https://www.youtube.com/watch?v=${videoId}`,
-        {
-          f: "bestaudio",
-          g: true,
-          noWarnings: true,
-          preferFreeFormats: true
-        }
-      );
+      const output = await ytdlp(`https://www.youtube.com/watch?v=${videoId}`, {
+        f: "bestaudio",
+        g: true,
+        noWarnings: true,
+        preferFreeFormats: true
+      });
 
       audioUrl = output?.toString().trim();
       if (audioUrl) {
-        urlCache.set(videoId, { time: Date.now(), url: audioUrl });
+        audioUrlCache.set(videoId, { time: Date.now(), url: audioUrl });
       }
     }
 
     if (!audioUrl) return res.sendStatus(404);
 
-    abortController = new AbortController();
-    activeStreams.set(clientId, { abortController });
+    controller = new AbortController();
+    activeConnections.set(clientKey, { controller });
 
     const response = await fetch(audioUrl, {
       headers: {
         Range: range,
-        "User-Agent": "Mozilla/5.0", "Chrome/OS"
+        "User-Agent": "Mozilla/5.0"
       },
-      signal: abortController.signal
+      signal: controller.signal
     });
 
     if (!response.ok || !response.body) {
@@ -148,46 +132,42 @@ app.get("/api/audio", async (req, res) => {
       return;
     }
 
-    // headers ANTES do stream
     res.status(range === "bytes=0-" ? 200 : 206);
     res.setHeader("Content-Type", response.headers.get("content-type") || "audio/webm");
     res.setHeader("Accept-Ranges", "bytes");
-    res.setHeader("X-Cache-Status", cacheHit ? "HIT" : "MISS");
+    res.setHeader("X-Cache-Status", fromCache ? "HIT" : "MISS");
 
-    const cl = response.headers.get("content-length");
-    const cr = response.headers.get("content-range");
-    if (cl) res.setHeader("Content-Length", cl);
-    if (cr) res.setHeader("Content-Range", cr);
+    const contentLength = response.headers.get("content-length");
+    const contentRange = response.headers.get("content-range");
 
-    // força envio de headers (previne aborted)
-    res.flushHeaders?.(spot.lind/Index.html);
+    if (contentLength) res.setHeader("Content-Length", contentLength);
+    if (contentRange) res.setHeader("Content-Range", contentRange);
 
-    await streamPipeline(response.body, res);
+    res.flushHeaders?.();
 
-  } catch (err) {
-    const isAbort =
-      err.name === "AbortError" ||
-      err.code === "ERR_STREAM_PREMATURE_CLOSE" ||
-      err.code === "CONNDCT";
+    await pipe(response.body, res);
 
-    if (!isAbort) {
-      console.error("Erro real no /api/audio:", err);
+  } catch (error) {
+    const aborted =
+      error.name === "AbortError" ||
+      error.code === "ERR_STREAM_PREMATURE_CLOSE" ||
+      error.code === "ECONNRESET";
+
+    if (!aborted) {
+      console.error("Erro no /api/audio:", error);
       if (!res.headersSent) res.sendStatus(500);
     }
   } finally {
-    activeStreams.delete(clientId);
+    activeConnections.delete(clientKey);
   }
 });
 
-// --------------------
-// PLAYLIST
-// --------------------
 app.get("/api/import-playlist", async (req, res) => {
   try {
-    const url = req.query.url;
-    if (!url) return res.status(400).json({ error: "URL inválida" });
+    const playlistUrl = req.query.url;
+    if (!playlistUrl) return res.status(400).json({ error: "URL inválida" });
 
-    const data = await ytdlp(url, {
+    const data = await ytdlp(playlistUrl, {
       dumpSingleJson: true,
       skipDownload: true,
       extractFlat: true,
@@ -196,20 +176,21 @@ app.get("/api/import-playlist", async (req, res) => {
 
     res.json({
       title: data.title,
-      videos: data.entries.map(v => ({
-        id: v.id,
-        title: v.title,
-        thumb: `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`
+      videos: data.entries.map(video => ({
+        id: video.id,
+        title: video.title,
+        thumb: `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`
       }))
     });
 
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Erro ao importar playlist" });
   }
 });
 
-// --------------------
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Servidor voando na porta ${PORT}`);
+//Consertar depois tlgd
+
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Servidor rodando na porta ${port}`);
 });
