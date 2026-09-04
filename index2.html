@@ -1,0 +1,1359 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Exlify - Premium Player</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons para ícones fiéis -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts: Inter e Circular Std fallback -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { 
+                        sans: ['Inter', 'sans-serif'] // Inter é a fonte gratuita mais próxima da Circular Std do Spotify
+                    },
+                    colors: {
+                        spotify: {
+                            green: '#1ed760',
+                            greenHover: '#1fdf64',
+                            black: '#000000',
+                            base: '#121212',
+                            elevated: '#1a1a1a',
+                            highlight: '#2a2a2a',
+                            text: '#b3b3b3',
+                            white: '#ffffff',
+                            divider: '#282828'
+                        }
+                    },
+                    animation: {
+                        'spin-slow': 'spin 3s linear infinite',
+                        'slide-up': 'slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards',
+                        'slide-down': 'slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards',
+                    },
+                    keyframes: {
+                        slideUp: {
+                            '0%': { transform: 'translateY(100%)' },
+                            '100%': { transform: 'translateY(0)' },
+                        },
+                        slideDown: {
+                            '0%': { transform: 'translateY(0)' },
+                            '100%': { transform: 'translateY(100%)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Estilização da Scrollbar idêntica ao Spotify */
+        ::-webkit-scrollbar {
+            width: 12px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.3);
+            border: 3px solid transparent; /* Cria padding mágico */
+            background-clip: padding-box;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+
+        body {
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+        }
+
+        .no-select {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* --- Custom Range Sliders --- */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            height: 4px;
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+            z-index: 10;
+        }
+        input[type=range]:focus { outline: none; }
+        
+        /* Thumb invisible by default, shows on hover of container */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            background: #fff;
+            margin-top: -4px;
+            opacity: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            transition: opacity 0.1s;
+        }
+        input[type=range]::-moz-range-thumb {
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            background: #fff;
+            border: none;
+            opacity: 0;
+        }
+
+        .slider-container:hover input[type=range]::-webkit-slider-thumb { opacity: 1; }
+        .slider-container:hover input[type=range]::-moz-range-thumb { opacity: 1; }
+        
+        /* The colored progress bar effect */
+        .slider-bg {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            left: 0;
+            right: 0;
+            height: 4px;
+            background-color: #4d4d4d;
+            border-radius: 2px;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .slider-progress {
+            height: 100%;
+            background-color: #fff;
+            width: 0%;
+            border-radius: 2px;
+            transition: background-color 0.1s;
+        }
+        .slider-container:hover .slider-progress {
+            background-color: #1ed760;
+        }
+
+        /* Line Clamp for Text */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;  
+            overflow: hidden;
+        }
+
+        /* Lyrics Active Line Effect */
+        .lyric-line {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .lyric-line:hover { color: #fff; }
+        .lyric-active {
+            color: #fff;
+            font-weight: 700;
+            transform: scale(1.05);
+            transform-origin: left;
+        }
+
+        /* Track Hover Effect (Play icon replace number) */
+        .track-row:hover .track-num { display: none; }
+        .track-row:hover .track-play { display: block; }
+        .track-play { display: none; }
+
+        /* Mobile Player Transition Classes */
+        #mobileFullPlayer {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body class="bg-black text-spotify-text font-sans h-screen flex flex-col overflow-hidden no-select">
+
+    <!-- Container Principal Responsivo -->
+    <div class="flex-1 flex overflow-hidden p-0 md:p-2 gap-2 pb-[72px] md:pb-0 relative">
+        
+        <!-- SIDEBAR ESQUERDA (Desktop) -->
+        <nav class="hidden md:flex w-[280px] lg:w-[350px] flex-col gap-2 h-full flex-shrink-0">
+            <!-- Navegação Topo -->
+            <div class="bg-spotify-base rounded-lg p-6 flex flex-col gap-5">
+                <a href="#" class="flex items-center gap-4 text-spotify-text hover:text-white transition font-bold text-base group" onclick="navigate('home')">
+                    <i class="ph-fill ph-house text-2xl group-hover:text-white"></i> Início
+                </a>
+                <a href="#" class="flex items-center gap-4 text-spotify-text hover:text-white transition font-bold text-base group" onclick="navigate('search')">
+                    <i class="ph ph-magnifying-glass text-2xl group-hover:text-white" id="searchNavIcon"></i> Buscar
+                </a>
+            </div>
+
+            <!-- Biblioteca -->
+            <div class="bg-spotify-base rounded-lg p-2 flex-1 flex flex-col min-h-0 relative">
+                <div class="flex items-center justify-between px-4 py-2 sticky top-0 bg-spotify-base z-10 shadow-sm shadow-spotify-base">
+                    <button class="flex items-center gap-3 text-spotify-text hover:text-white transition font-bold group" title="Ocultar a sua Biblioteca">
+                        <i class="ph ph-books text-2xl group-hover:text-white"></i> Sua Biblioteca
+                    </button>
+                    <div class="flex gap-2">
+                        <button class="text-spotify-text hover:text-white transition p-1.5 hover:bg-spotify-highlight rounded-full">
+                            <i class="ph ph-plus text-lg"></i>
+                        </button>
+                        <button class="text-spotify-text hover:text-white transition p-1.5 hover:bg-spotify-highlight rounded-full">
+                            <i class="ph ph-arrow-right text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filtros -->
+                <div class="flex gap-2 px-4 py-2 overflow-x-hidden">
+                    <span class="bg-spotify-highlight text-white text-sm px-3 py-1.5 rounded-full cursor-pointer hover:bg-spotify-divider transition font-medium">Playlists</span>
+                    <span class="bg-spotify-highlight text-white text-sm px-3 py-1.5 rounded-full cursor-pointer hover:bg-spotify-divider transition font-medium">Artistas</span>
+                </div>
+                
+                <!-- Lista da Biblioteca -->
+                <div class="flex-1 overflow-y-auto px-2 space-y-1 mt-2 pb-4" id="libraryList">
+                    <!-- Gerado via JS -->
+                </div>
+            </div>
+        </nav>
+
+        <!-- ÁREA DE CONTEÚDO PRINCIPAL -->
+        <main class="flex-1 bg-spotify-base md:rounded-lg flex flex-col relative overflow-hidden bg-gradient-to-b from-spotify-divider/40 to-spotify-base">
+            
+            <!-- Header Fixo Topo -->
+            <header class="h-16 px-4 md:px-6 flex items-center justify-between sticky top-0 bg-transparent z-20 transition-colors duration-300" id="mainHeader">
+                <div class="flex items-center gap-2 md:gap-4 flex-1">
+                    <div class="hidden md:flex gap-2">
+                        <button class="w-8 h-8 rounded-full bg-black/70 flex items-center justify-center text-white cursor-pointer hover:bg-black transition" onclick="historyBack()">
+                            <i class="ph ph-caret-left text-xl"></i>
+                        </button>
+                        <button class="w-8 h-8 rounded-full bg-black/70 flex items-center justify-center text-spotify-text cursor-not-allowed">
+                            <i class="ph ph-caret-right text-xl"></i>
+                        </button>
+                    </div>
+
+                    <!-- Search Input (Aparece na rota search) -->
+                    <div id="searchContainer" class="hidden relative max-w-[364px] w-full ml-0">
+                        <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-black text-xl"></i>
+                        <input type="text" id="searchInput" 
+                               class="w-full bg-white text-black h-12 rounded-full pl-10 pr-10 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-white" 
+                               placeholder="O que você quer ouvir?"
+                               oninput="handleSearch()">
+                        <button id="clearSearchBtn" class="absolute right-3 top-1/2 -translate-y-1/2 text-black hidden hover:scale-105" onclick="clearSearch()">
+                            <i class="ph ph-x text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 md:gap-4">
+                    <button class="bg-white text-black text-sm font-bold px-4 py-1.5 rounded-full hover:scale-105 transition hidden lg:block">Explorar Premium</button>
+                    <button class="bg-black/70 text-white text-sm font-bold px-4 py-1.5 rounded-full hover:scale-105 hover:bg-black transition hidden md:flex items-center gap-2 border border-spotify-divider">
+                        <i class="ph ph-arrow-circle-down text-lg"></i> Instalar aplicativo
+                    </button>
+                    <button class="w-8 h-8 md:w-8 md:h-8 rounded-full bg-spotify-highlight flex items-center justify-center text-white hover:scale-105 transition shadow-lg border-4 border-black/50">
+                        <span class="text-sm font-bold">EX</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Área de Scroll Dinâmica -->
+            <div class="flex-1 overflow-y-auto px-4 md:px-6 pb-24 md:pb-6 relative z-10" id="mainScrollArea" onscroll="handleScroll()">
+                
+                <!-- VIEW: INÍCIO -->
+                <div id="view-home" class="view-section block pt-2">
+                    <div class="flex gap-2 mb-6">
+                        <button class="bg-white text-black px-4 py-1.5 rounded-full text-sm font-medium transition">Tudo</button>
+                        <button class="bg-spotify-highlight hover:bg-spotify-divider text-white px-4 py-1.5 rounded-full text-sm font-medium transition">Música</button>
+                        <button class="bg-spotify-highlight hover:bg-spotify-divider text-white px-4 py-1.5 rounded-full text-sm font-medium transition">Podcasts</button>
+                    </div>
+
+                    <!-- Grid de Top Hits Recentes (Cards Horizontais) -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 mb-10" id="homeRecentGrid">
+                        <!-- JS injects here -->
+                    </div>
+
+                    <!-- Seções de Playlists -->
+                    <div class="flex justify-between items-end mb-4">
+                        <h2 class="text-white text-2xl font-bold hover:underline cursor-pointer">Feito para você</h2>
+                        <span class="text-sm font-bold hover:underline cursor-pointer">Mostrar tudo</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-10" id="homeMadeForYou">
+                        <!-- JS injects here -->
+                    </div>
+
+                    <div class="flex justify-between items-end mb-4">
+                        <h2 class="text-white text-2xl font-bold hover:underline cursor-pointer">Seus mixes mais ouvidos</h2>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-10" id="homeMixes">
+                        <!-- JS injects here -->
+                    </div>
+                </div>
+
+                <!-- VIEW: BUSCA -->
+                <div id="view-search" class="view-section hidden pt-2">
+                    <!-- Estado Inicial (Categorias) -->
+                    <div id="searchBrowseMode">
+                        <h2 class="text-white text-2xl font-bold mb-6">Navegar por todas as seções</h2>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" id="searchCategories">
+                            <!-- JS injects colored blocks -->
+                        </div>
+                    </div>
+                    
+                    <!-- Resultados da Busca -->
+                    <div id="searchResultsMode" class="hidden">
+                        <div class="flex flex-col md:flex-row gap-6 mb-8">
+                            <!-- Top Result -->
+                            <div class="flex-1">
+                                <h2 class="text-white text-2xl font-bold mb-4">Melhor resultado</h2>
+                                <div class="bg-spotify-elevated hover:bg-spotify-highlight transition p-5 rounded-md cursor-pointer group relative">
+                                    <img src="" id="topResultImg" class="w-24 h-24 rounded-full shadow-lg mb-4 object-cover">
+                                    <h3 class="text-white text-3xl font-bold mb-1" id="topResultTitle">Título</h3>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm text-spotify-text" id="topResultArtist">Artista</span>
+                                        <span class="bg-black text-white text-xs px-2 py-1 rounded-full font-bold uppercase">Música</span>
+                                    </div>
+                                    <button class="absolute bottom-5 right-5 w-12 h-12 rounded-full bg-spotify-green text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-105 shadow-xl translate-y-2 group-hover:translate-y-0" onclick="playTrack(0)">
+                                        <i class="ph-fill ph-play text-xl"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- List Results -->
+                            <div class="flex-[1.5]">
+                                <h2 class="text-white text-2xl font-bold mb-4">Músicas</h2>
+                                <div class="flex flex-col gap-1" id="searchListResults">
+                                    <!-- JS injects list -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: FILA DE REPRODUÇÃO -->
+                <div id="view-queue" class="view-section hidden pt-6 px-2 md:px-10">
+                    <h2 class="text-white text-2xl font-bold mb-6">Fila de reprodução</h2>
+                    
+                    <h3 class="text-white text-base font-bold mb-2">Tocando agora</h3>
+                    <div id="queueNowPlaying" class="mb-8 bg-spotify-highlight/30 rounded-md p-2"></div>
+                    
+                    <h3 class="text-spotify-text text-base font-bold mb-4">A seguir</h3>
+                    <div class="flex flex-col gap-1" id="queueList"></div>
+                </div>
+
+                <!-- VIEW: LETRAS (LYRICS) -->
+                <div id="view-lyrics" class="view-section hidden h-full flex flex-col justify-center">
+                    <div class="max-w-3xl mx-auto w-full py-10" id="lyricsContainer">
+                        <!-- JS syncs lyrics here -->
+                        <div class="text-4xl md:text-6xl font-bold text-center text-spotify-text py-20" id="lyricsFallback">
+                            Instrumental / Letra não disponível
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- PLAYER INFERIOR (DESKTOP) -->
+    <footer class="hidden md:flex h-[90px] bg-black px-4 items-center justify-between z-50 flex-shrink-0" id="desktopPlayer">
+        
+        <!-- Esquerda: Info da Faixa -->
+        <div class="flex items-center w-[30%] min-w-[180px] gap-4">
+            <div class="w-14 h-14 relative group cursor-pointer" onclick="toggleMobileFullPlayer()">
+                <img id="playerCover" src="https://placehold.co/56/282828/282828" class="w-full h-full object-cover rounded shadow-sm">
+                <button class="absolute top-1 right-1 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                    <i class="ph ph-caret-up text-white text-xs"></i>
+                </button>
+            </div>
+            <div class="flex flex-col justify-center overflow-hidden">
+                <div class="text-white text-sm font-medium hover:underline cursor-pointer truncate" id="playerTitle">Nenhuma música tocando</div>
+                <div class="text-xs text-spotify-text hover:underline cursor-pointer truncate" id="playerArtist">Selecione uma faixa</div>
+            </div>
+            <button class="text-spotify-text hover:text-white transition group">
+                <i class="ph ph-heart text-xl group-hover:scale-105"></i>
+            </button>
+        </div>
+
+        <!-- Centro: Controles de Mídia -->
+        <div class="flex flex-col items-center max-w-[722px] w-[40%] px-4">
+            <div class="flex items-center gap-4 md:gap-6 mb-1">
+                <button class="text-spotify-text hover:text-white transition" onclick="toggleState('shuffle')" id="btnShuffle">
+                    <i class="ph ph-shuffle text-xl"></i>
+                </button>
+                <button class="text-spotify-text hover:text-white transition" onclick="prevTrack()">
+                    <i class="ph-fill ph-skip-back text-2xl hover:text-white"></i>
+                </button>
+                <button class="w-8 h-8 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 transition shadow-md" onclick="togglePlayPause()">
+                    <i id="playerPlayIcon" class="ph-fill ph-play text-lg"></i>
+                </button>
+                <button class="text-spotify-text hover:text-white transition" onclick="nextTrack()">
+                    <i class="ph-fill ph-skip-forward text-2xl hover:text-white"></i>
+                </button>
+                <button class="text-spotify-text hover:text-white transition relative" onclick="toggleState('repeat')" id="btnRepeat">
+                    <i class="ph ph-repeat text-xl"></i>
+                    <!-- Dot para active state gerado via JS -->
+                </button>
+            </div>
+            
+            <div class="w-full flex items-center gap-2 text-xs text-spotify-text font-medium">
+                <span id="playerTimeCurrent" class="w-10 text-right">0:00</span>
+                <div class="flex-1 slider-container relative h-4 flex items-center group">
+                    <input type="range" id="progressSlider" min="0" max="100" value="0" class="w-full absolute opacity-0 h-full cursor-pointer z-20">
+                    <div class="slider-bg w-full z-0"><div id="progressFill" class="slider-progress w-0 relative z-10"></div></div>
+                </div>
+                <span id="playerTimeTotal" class="w-10">0:00</span>
+            </div>
+        </div>
+
+        <!-- Direita: Controles Extras -->
+        <div class="flex items-center justify-end w-[30%] min-w-[180px] gap-3 text-spotify-text">
+            <button class="hover:text-white transition hover:scale-105" onclick="navigate('lyrics')" title="Letras" id="btnLyrics">
+                <i class="ph ph-microphone-stage text-xl"></i>
+            </button>
+            <button class="hover:text-white transition hover:scale-105" onclick="navigate('queue')" title="Fila" id="btnQueue">
+                <i class="ph ph-queue text-xl"></i>
+            </button>
+            <button class="hover:text-white transition hover:scale-105 group relative" onclick="openCastModal()" title="Conectar a um dispositivo">
+                <i class="ph ph-screencast text-xl group-hover:text-spotify-green"></i>
+                <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-spotify-green hidden" id="castActiveDot"></div>
+            </button>
+            
+            <!-- Controle de Volume -->
+            <div class="flex items-center gap-2 ml-2 w-[93px] group">
+                <button class="hover:text-white transition" onclick="toggleMute()">
+                    <i id="volIcon" class="ph ph-speaker-high text-xl"></i>
+                </button>
+                <div class="flex-1 slider-container relative h-4 flex items-center">
+                    <input type="range" id="volumeSlider" min="0" max="100" value="100" class="w-full absolute opacity-0 h-full cursor-pointer z-20">
+                    <div class="slider-bg w-full z-0"><div id="volumeFill" class="slider-progress w-full relative z-10 bg-white group-hover:bg-spotify-green"></div></div>
+                </div>
+            </div>
+            
+            <button class="hover:text-white transition ml-2 hidden lg:block" title="Tela Cheia">
+                <i class="ph ph-arrows-out-simple text-lg"></i>
+            </button>
+        </div>
+    </footer>
+
+    <!-- MOBILE MINI PLAYER -->
+    <div id="mobileMiniPlayer" class="md:hidden fixed bottom-[65px] left-2 right-2 h-[56px] bg-[#2a2a2a] rounded-md shadow-lg border-b-2 border-transparent z-40 flex items-center px-2 cursor-pointer transition-transform" onclick="toggleMobileFullPlayer()">
+        <div class="w-10 h-10 flex-shrink-0 relative overflow-hidden rounded mr-3">
+            <img id="mobileMiniCover" src="https://placehold.co/40/282828/282828" class="w-full h-full object-cover">
+        </div>
+        <div class="flex-1 overflow-hidden">
+            <div class="text-white text-sm font-bold truncate flex items-center gap-2">
+                <span id="mobileMiniTitle">Música</span>
+                <span class="text-spotify-text text-xs font-normal truncate" id="mobileMiniArtist">Artista</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 px-2" onclick="event.stopPropagation()">
+            <button class="text-white" onclick="openCastModal()"><i class="ph ph-screencast text-xl"></i></button>
+            <button class="text-white w-8 h-8 flex items-center justify-center" onclick="togglePlayPause()">
+                <i id="mobileMiniPlayIcon" class="ph-fill ph-play text-xl"></i>
+            </button>
+        </div>
+        <!-- Progress Bar Underneath -->
+        <div class="absolute bottom-0 left-2 right-2 h-[2px] bg-white/20 rounded-full overflow-hidden">
+            <div id="mobileMiniProgress" class="h-full bg-white w-0 rounded-full transition-all duration-300"></div>
+        </div>
+    </div>
+
+    <!-- MOBILE FULL PLAYER MODAL -->
+    <div id="mobileFullPlayer" class="md:hidden fixed inset-0 z-50 bg-gradient-to-b from-gray-800 to-black text-white flex flex-col translate-y-full">
+        <!-- Top Nav -->
+        <div class="flex items-center justify-between p-4 px-6 relative">
+            <button onclick="toggleMobileFullPlayer()" class="text-white p-2 -ml-2"><i class="ph ph-caret-down text-2xl"></i></button>
+            <div class="text-center flex-1">
+                <p class="text-xs font-bold tracking-widest uppercase opacity-70">Tocando da Playlist</p>
+                <p class="text-sm font-bold">As Melhores</p>
+            </div>
+            <button class="text-white p-2 -mr-2"><i class="ph ph-dots-three-vertical text-2xl"></i></button>
+        </div>
+
+        <!-- Cover Art -->
+        <div class="flex-1 flex items-center justify-center p-6 w-full max-h-[50vh]">
+            <img id="mobileFullCover" src="https://placehold.co/300/282828/282828" class="w-full aspect-square max-w-[340px] object-cover rounded-lg shadow-2xl">
+        </div>
+
+        <!-- Controls Area -->
+        <div class="px-6 pb-8 flex flex-col justify-end">
+            <!-- Title & Heart -->
+            <div class="flex items-end justify-between mb-6">
+                <div class="flex-1 pr-4 overflow-hidden">
+                    <h2 class="text-2xl font-bold truncate text-white mb-1" id="mobileFullTitle">Título</h2>
+                    <p class="text-base text-spotify-text truncate" id="mobileFullArtist">Artista</p>
+                </div>
+                <button class="text-spotify-green mb-1"><i class="ph-fill ph-check-circle text-2xl"></i></button>
+            </div>
+
+            <!-- Scrubber -->
+            <div class="w-full mb-1">
+                <div class="slider-container relative h-4 flex items-center group w-full">
+                    <input type="range" id="mobileProgressSlider" min="0" max="100" value="0" class="w-full absolute opacity-0 h-full cursor-pointer z-20">
+                    <div class="slider-bg w-full z-0 h-1 bg-white/30"><div id="mobileProgressFill" class="slider-progress w-0 relative z-10 bg-white"></div></div>
+                </div>
+            </div>
+            <div class="flex justify-between text-xs text-spotify-text font-medium mb-4">
+                <span id="mobileTimeCurrent">0:00</span>
+                <span id="mobileTimeTotal">0:00</span>
+            </div>
+
+            <!-- Main Buttons -->
+            <div class="flex items-center justify-between mb-6 px-2">
+                <button class="text-white/70 hover:text-white" onclick="toggleState('shuffle')"><i class="ph ph-shuffle text-2xl" id="mobBtnShuffle"></i></button>
+                <button class="text-white" onclick="prevTrack()"><i class="ph-fill ph-skip-back text-4xl"></i></button>
+                <button class="w-16 h-16 bg-white rounded-full flex items-center justify-center text-black" onclick="togglePlayPause()">
+                    <i id="mobileFullPlayIcon" class="ph-fill ph-play text-2xl ml-1"></i>
+                </button>
+                <button class="text-white" onclick="nextTrack()"><i class="ph-fill ph-skip-forward text-4xl"></i></button>
+                <button class="text-white/70 hover:text-white" onclick="toggleState('repeat')"><i class="ph ph-repeat text-2xl" id="mobBtnRepeat"></i></button>
+            </div>
+
+            <!-- Bottom Actions -->
+            <div class="flex items-center justify-between">
+                <button class="text-white" onclick="openCastModal()"><i class="ph ph-screencast text-xl hover:text-spotify-green transition" id="mobCastIcon"></i></button>
+                <div class="flex items-center gap-4">
+                    <button class="text-white/70" onclick="navigate('lyrics'); toggleMobileFullPlayer();"><i class="ph ph-microphone-stage text-xl"></i></button>
+                    <button class="text-white/70" onclick="navigate('queue'); toggleMobileFullPlayer();"><i class="ph ph-list-dashes text-xl"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOBILE BOTTOM NAV -->
+    <nav class="md:hidden bg-gradient-to-t from-black via-black/90 to-transparent pb-4 pt-6 px-6 flex justify-around items-center fixed bottom-0 w-full z-30 pointer-events-none">
+        <div class="flex justify-around w-full pointer-events-auto bg-black/50 backdrop-blur-md pb-2 pt-2">
+            <button class="flex flex-col items-center gap-1 text-white group" onclick="navigate('home')">
+                <i class="ph-fill ph-house text-2xl transition-transform group-hover:scale-110" id="mobNavHome"></i>
+                <span class="text-[10px] font-medium">Início</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-spotify-text group hover:text-white transition" onclick="navigate('search')">
+                <i class="ph ph-magnifying-glass text-2xl transition-transform group-hover:scale-110" id="mobNavSearch"></i>
+                <span class="text-[10px] font-medium">Buscar</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 text-spotify-text group hover:text-white transition">
+                <i class="ph ph-books text-2xl transition-transform group-hover:scale-110"></i>
+                <span class="text-[10px] font-medium">Sua Biblioteca</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- CAST MODAL -->
+    <div id="castModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] opacity-0 pointer-events-none transition-opacity duration-300 backdrop-blur-sm" onclick="closeCastModal(event)">
+        <div class="bg-spotify-elevated rounded-xl p-6 w-[350px] shadow-2xl transform scale-95 transition-transform duration-300 border border-white/10" id="castModalContent" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex items-center gap-3">
+                    <i class="ph ph-screencast text-2xl text-white"></i>
+                    <h3 class="text-xl font-bold text-white">Conectar a um dispositivo</h3>
+                </div>
+                <button onclick="closeCastModal()" class="text-spotify-text hover:text-white p-1 bg-white/5 rounded-full"><i class="ph ph-x text-lg"></i></button>
+            </div>
+            
+            <div class="space-y-1">
+                <!-- Current Device -->
+                <div class="flex items-center justify-between p-3 bg-white/10 rounded-lg cursor-default border border-spotify-green">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-spotify-green/20 flex items-center justify-center">
+                            <i class="ph ph-laptop text-xl text-spotify-green"></i>
+                        </div>
+                        <div>
+                            <p class="text-spotify-green font-bold text-sm">Este Computador</p>
+                            <p class="text-xs text-spotify-green/80 flex items-center gap-1"><i class="ph-fill ph-speaker-high"></i> Ouvindo agora</p>
+                        </div>
+                    </div>
+                    <div class="w-2 h-2 rounded-full bg-spotify-green animate-pulse"></div>
+                </div>
+                
+                <p class="text-xs font-bold text-spotify-text mt-4 mb-2 uppercase px-2">Outros dispositivos</p>
+
+                <!-- Target Devices -->
+                <div class="flex items-center gap-4 p-3 hover:bg-white/10 rounded-lg cursor-pointer transition group" onclick="simulateCast('TV da Sala')">
+                    <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-white/20 transition">
+                        <i class="ph ph-television text-xl text-white"></i>
+                    </div>
+                    <div>
+                        <p class="text-white font-bold text-sm">TV da Sala (Chromecast)</p>
+                        <p class="text-xs text-spotify-text">Spotify Connect</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4 p-3 hover:bg-white/10 rounded-lg cursor-pointer transition group" onclick="simulateCast('Echo Dot')">
+                    <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-white/20 transition">
+                        <i class="ph ph-speaker-hifi text-xl text-white"></i>
+                    </div>
+                    <div>
+                        <p class="text-white font-bold text-sm">Echo Dot Quarto</p>
+                        <p class="text-xs text-spotify-text">Bluetooth</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION TOAST -->
+    <div id="toast" class="fixed bottom-24 md:bottom-28 left-1/2 -translate-x-1/2 bg-[#2e77d0] text-white px-6 py-3 rounded-lg shadow-xl font-bold text-sm transform translate-y-10 opacity-0 transition-all duration-300 z-[110] pointer-events-none flex items-center gap-2">
+        <i class="ph-fill ph-info text-xl"></i>
+        <span id="toastMsg">Mensagem</span>
+    </div>
+
+    <!-- MENSAGEM INICIAL DE DICA -->
+    <div id="welcomeDialog" class="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4">
+        <div class="bg-[#181818] p-8 rounded-xl max-w-md text-center shadow-[0_0_50px_rgba(30,215,96,0.3)]">
+            <i class="ph-fill ph-spotify-logo text-6xl text-spotify-green mb-4"></i>
+            <h2 class="text-3xl font-bold text-white mb-2">Bem-vindo ao Clone!</h2>
+            <p class="text-spotify-text mb-6">Este é um ambiente simulado com um único arquivo. Clicar no Play buscará músicas de bibliotecas de domínio público gratuitas, para que você possa testar o player de áudio real.</p>
+            <button class="bg-spotify-green text-black font-bold text-lg px-8 py-3 rounded-full hover:scale-105 transition" onclick="document.getElementById('welcomeDialog').remove()">Começar a ouvir</button>
+        </div>
+    </div>
+
+    <!-- Hidden Audio Element -->
+    <audio id="coreAudioPlayer"></audio>
+
+    <script>
+        // --- MOCK DATABASE (Áudio Real via URLs públicas para demonstração) ---
+        // Usamos músicas royalty-free da Bensound / SoundHelix para que o player funcione
+        const db = [
+            { id: 1, title: "Summer Breeze", artist: "Bensound", album: "Pop Essentials", cover: "https://placehold.co/300/ff6b6b/fff?text=Summer", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", duration: 372 },
+            { id: 2, title: "Epic Cinematic", artist: "John Doe", album: "Soundtracks", cover: "https://placehold.co/300/4facfe/fff?text=Epic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", duration: 425 },
+            { id: 3, title: "Jazz Comedy", artist: "Smile", album: "Smooth", cover: "https://placehold.co/300/f6d365/fff?text=Jazz", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3", duration: 344 },
+            { id: 4, title: "Rock Action", artist: "The Band", album: "Heavy", cover: "https://placehold.co/300/434343/fff?text=Rock", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3", duration: 302 },
+            { id: 5, title: "LoFi Chill", artist: "Study Beats", album: "Focus 2026", cover: "https://placehold.co/300/a18cd1/fff?text=LoFi", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3", duration: 320 },
+            { id: 6, title: "Synthwave Night", artist: "Retro 80s", album: "Neon", cover: "https://placehold.co/300/ff0844/fff?text=Neon", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3", duration: 250 }
+        ];
+
+        // Mock Lyrics (Simulated sync)
+        const mockLyrics = [
+            { t: 0, text: "(Música Instrumental)" },
+            { t: 10, text: "Bem-vindo ao Exlify Premium" },
+            { t: 15, text: "Este é um clone em um único arquivo HTML" },
+            { t: 20, text: "A música sendo reproduzida é de domínio público" },
+            { t: 25, text: "Mas os controles, o visual e a fila" },
+            { t: 30, text: "São projetados para imitar a experiência real" },
+            { t: 40, text: "(Aproveite o som...)" },
+            { t: 60, text: "Você pode buscar outras faixas na aba Buscar" },
+            { t: 70, text: "Ou transmitir para um dispositivo via modal Cast" },
+            { t: 999, text: "" }
+        ];
+
+        // --- APP STATE ---
+        const state = {
+            currentView: 'home',
+            isPlaying: false,
+            currentTrackIndex: 0,
+            queue: [...db], // Copia inicial
+            originalQueue: [...db],
+            volume: 1,
+            isMuted: false,
+            isShuffle: false,
+            isRepeat: false,
+            duration: 0,
+            currentTime: 0,
+            castDevice: null
+        };
+
+        // --- DOM REFERENCES ---
+        const dom = {
+            audio: document.getElementById('coreAudioPlayer'),
+            // Views
+            views: {
+                home: document.getElementById('view-home'),
+                search: document.getElementById('view-search'),
+                queue: document.getElementById('view-queue'),
+                lyrics: document.getElementById('view-lyrics')
+            },
+            // Controls Desktop
+            dPlayIcon: document.getElementById('playerPlayIcon'),
+            dCover: document.getElementById('playerCover'),
+            dTitle: document.getElementById('playerTitle'),
+            dArtist: document.getElementById('playerArtist'),
+            dTimeCur: document.getElementById('playerTimeCurrent'),
+            dTimeTot: document.getElementById('playerTimeTotal'),
+            dProgFill: document.getElementById('progressFill'),
+            dProgSlider: document.getElementById('progressSlider'),
+            dVolFill: document.getElementById('volumeFill'),
+            dVolSlider: document.getElementById('volumeSlider'),
+            dVolIcon: document.getElementById('volIcon'),
+            // Controls Mobile Full
+            mFull: document.getElementById('mobileFullPlayer'),
+            mPlayIcon: document.getElementById('mobileFullPlayIcon'),
+            mCover: document.getElementById('mobileFullCover'),
+            mTitle: document.getElementById('mobileFullTitle'),
+            mArtist: document.getElementById('mobileFullArtist'),
+            mTimeCur: document.getElementById('mobileTimeCurrent'),
+            mTimeTot: document.getElementById('mobileTimeTotal'),
+            mProgFill: document.getElementById('mobileProgressFill'),
+            mProgSlider: document.getElementById('mobileProgressSlider'),
+            // Controls Mobile Mini
+            mMini: document.getElementById('mobileMiniPlayer'),
+            mMiniPlayIcon: document.getElementById('mobileMiniPlayIcon'),
+            mMiniCover: document.getElementById('mobileMiniCover'),
+            mMiniTitle: document.getElementById('mobileMiniTitle'),
+            mMiniArtist: document.getElementById('mobileMiniArtist'),
+            mMiniProg: document.getElementById('mobileMiniProgress')
+        };
+
+        // --- AUDIO ENGINE ---
+        
+        function loadTrack(index, autoPlay = true) {
+            if(index < 0 || index >= state.queue.length) return;
+            state.currentTrackIndex = index;
+            const track = state.queue[index];
+            
+            dom.audio.src = track.url;
+            dom.audio.load();
+            
+            // Update UI (Metadata)
+            updatePlayerUI(track);
+            renderQueueView(); // Atualiza a fila se ela estiver aberta
+            
+            if (autoPlay) {
+                playAudio();
+            }
+        }
+
+        function playAudio() {
+            dom.audio.play().catch(e => {
+                console.log("Autoplay prevent", e);
+                showToast("Clique no play para iniciar o áudio");
+            });
+            state.isPlaying = true;
+            syncPlayStateUI();
+        }
+
+        function pauseAudio() {
+            dom.audio.pause();
+            state.isPlaying = false;
+            syncPlayStateUI();
+        }
+
+        function togglePlayPause() {
+            // Se tentar tocar mas não tem source, carrega a primeira
+            if (!dom.audio.src || dom.audio.src === window.location.href) {
+                loadTrack(0);
+                return;
+            }
+            state.isPlaying ? pauseAudio() : playAudio();
+        }
+
+        function nextTrack() {
+            if (state.isRepeat && state.currentTrackIndex === state.queue.length - 1) {
+                loadTrack(0);
+            } else if (state.currentTrackIndex < state.queue.length - 1) {
+                loadTrack(state.currentTrackIndex + 1);
+            } else {
+                pauseAudio(); // Fim da fila
+                dom.audio.currentTime = 0;
+            }
+        }
+
+        function prevTrack() {
+            if (dom.audio.currentTime > 3) {
+                dom.audio.currentTime = 0; // Se passou 3s, apenas reinicia a música
+            } else if (state.currentTrackIndex > 0) {
+                loadTrack(state.currentTrackIndex - 1);
+            }
+        }
+
+        // --- AUDIO EVENT LISTENERS ---
+        
+        dom.audio.addEventListener('loadedmetadata', () => {
+            state.duration = dom.audio.duration;
+            const formatted = formatTime(state.duration);
+            dom.dTimeTot.innerText = formatted;
+            dom.mTimeTot.innerText = formatted;
+        });
+
+        dom.audio.addEventListener('timeupdate', () => {
+            if(!state.duration) return;
+            state.currentTime = dom.audio.currentTime;
+            const percent = (state.currentTime / state.duration) * 100;
+            
+            // Update Text
+            const formatted = formatTime(state.currentTime);
+            dom.dTimeCur.innerText = formatted;
+            dom.mTimeCur.innerText = formatted;
+            
+            // Update Sliders Fill
+            dom.dProgFill.style.width = `${percent}%`;
+            dom.mProgFill.style.width = `${percent}%`;
+            dom.mMiniProg.style.width = `${percent}%`;
+            
+            // Sync Input values (only if not currently sliding to avoid jumping)
+            if(!isDraggingProgress) {
+                dom.dProgSlider.value = percent;
+                dom.mProgSlider.value = percent;
+            }
+
+            // Sync Lyrics if open
+            if(state.currentView === 'lyrics') {
+                syncLyrics();
+            }
+        });
+
+        dom.audio.addEventListener('ended', () => {
+            if (state.isRepeat && state.queue.length === 1) {
+                dom.audio.currentTime = 0;
+                playAudio();
+            } else {
+                nextTrack();
+            }
+        });
+
+        // --- SCRUBBER (PROGRESS BAR) LOGIC ---
+        
+        let isDraggingProgress = false;
+        
+        function setupProgressSlider(sliderElement, fillElement) {
+            sliderElement.addEventListener('input', (e) => {
+                isDraggingProgress = true;
+                fillElement.style.width = `${e.target.value}%`;
+            });
+            sliderElement.addEventListener('change', (e) => {
+                isDraggingProgress = false;
+                if(state.duration) {
+                    dom.audio.currentTime = (e.target.value / 100) * state.duration;
+                }
+            });
+        }
+        setupProgressSlider(dom.dProgSlider, dom.dProgFill);
+        setupProgressSlider(dom.mProgSlider, dom.mProgFill);
+
+        // --- VOLUME LOGIC ---
+        
+        dom.dVolSlider.addEventListener('input', (e) => {
+            const vol = e.target.value / 100;
+            setVolume(vol);
+        });
+
+        function setVolume(vol) {
+            state.volume = vol;
+            state.isMuted = vol === 0;
+            dom.audio.volume = vol;
+            dom.dVolFill.style.width = `${vol * 100}%`;
+            dom.dVolSlider.value = vol * 100;
+            
+            let iconClass = "ph-speaker-high";
+            if (vol === 0) iconClass = "ph-speaker-none";
+            else if (vol < 0.5) iconClass = "ph-speaker-low";
+            
+            dom.dVolIcon.className = `ph ${iconClass} text-xl`;
+        }
+
+        function toggleMute() {
+            if (state.isMuted) {
+                setVolume(state.volume > 0 ? state.volume : 1);
+            } else {
+                setVolume(0);
+            }
+        }
+
+        // --- TOGGLE STATES (SHUFFLE/REPEAT) ---
+        
+        function toggleState(type) {
+            if (type === 'shuffle') {
+                state.isShuffle = !state.isShuffle;
+                const btns = [document.getElementById('btnShuffle'), document.getElementById('mobBtnShuffle')];
+                btns.forEach(btn => btn.classList.toggle('text-spotify-green', state.isShuffle));
+                
+                if (state.isShuffle) {
+                    // Simples shuffle: mistura do atual pra frente
+                    const currentTrack = state.queue[state.currentTrackIndex];
+                    let remaining = state.queue.filter((_, i) => i !== state.currentTrackIndex);
+                    remaining.sort(() => Math.random() - 0.5);
+                    state.queue = [currentTrack, ...remaining];
+                    state.currentTrackIndex = 0;
+                } else {
+                    // Restore original
+                    const currentId = state.queue[state.currentTrackIndex].id;
+                    state.queue = [...state.originalQueue];
+                    state.currentTrackIndex = state.queue.findIndex(t => t.id === currentId);
+                }
+                showToast(state.isShuffle ? "Ordem aleatória ativada" : "Ordem aleatória desativada");
+                if(state.currentView === 'queue') renderQueueView();
+
+            } else if (type === 'repeat') {
+                state.isRepeat = !state.isRepeat;
+                const btns = [document.getElementById('btnRepeat'), document.getElementById('mobBtnRepeat')];
+                btns.forEach(btn => btn.classList.toggle('text-spotify-green', state.isRepeat));
+                
+                // Add dot via JS for desktop
+                const dot = document.querySelector('#btnRepeat div');
+                if(state.isRepeat && !dot) {
+                    document.getElementById('btnRepeat').innerHTML += `<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-spotify-green rounded-full dot-repeat"></div>`;
+                } else if (!state.isRepeat && document.querySelector('.dot-repeat')) {
+                    document.querySelector('.dot-repeat').remove();
+                }
+
+                showToast(state.isRepeat ? "Repetir ativado" : "Repetir desativado");
+            }
+        }
+
+        // --- UI UPDATERS ---
+        
+        function syncPlayStateUI() {
+            const playIcons = [dom.dPlayIcon, dom.mPlayIcon, dom.mMiniPlayIcon];
+            playIcons.forEach(icon => {
+                if (state.isPlaying) {
+                    icon.classList.remove('ph-play');
+                    icon.classList.add('ph-pause');
+                } else {
+                    icon.classList.remove('ph-pause');
+                    icon.classList.add('ph-play');
+                }
+            });
+            
+            // Atualiza barra de tocar da view "Busca" se estiver lá
+            document.querySelectorAll('.track-play').forEach(i => {
+                i.classList.remove('ph-pause');
+                i.classList.add('ph-play');
+            });
+        }
+
+        function updatePlayerUI(track) {
+            // Update Desktop
+            dom.dCover.src = track.cover;
+            dom.dTitle.innerText = track.title;
+            dom.dArtist.innerText = track.artist;
+            
+            // Update Mobile Full
+            dom.mCover.src = track.cover;
+            dom.mTitle.innerText = track.title;
+            dom.mArtist.innerText = track.artist;
+            
+            // Update Mobile Mini
+            dom.mMiniCover.src = track.cover;
+            dom.mMiniTitle.innerText = track.title;
+            dom.mMiniArtist.innerText = track.artist;
+            
+            // Change Main bg slightly to simulate cover color extraction
+            const darkColors = ['from-gray-800', 'from-blue-900', 'from-red-900', 'from-green-900', 'from-purple-900'];
+            const randomColor = darkColors[track.id % darkColors.length];
+            dom.mFull.className = `md:hidden fixed inset-0 z-50 bg-gradient-to-b ${randomColor} to-black text-white flex flex-col transition-transform duration-300 transform translate-y-0`;
+        }
+
+        // --- NAVIGATION & VIEWS ---
+        
+        function navigate(viewName) {
+            state.currentView = viewName;
+            
+            // Hide all views
+            Object.values(dom.views).forEach(el => el.classList.add('hidden'));
+            Object.values(dom.views).forEach(el => el.classList.remove('block'));
+            
+            // Show target
+            if (dom.views[viewName]) {
+                dom.views[viewName].classList.remove('hidden');
+                dom.views[viewName].classList.add('block');
+            }
+            
+            // Update active states on nav
+            document.querySelectorAll('nav a i, nav button i').forEach(i => i.classList.remove('ph-fill', 'text-white'));
+            
+            if (viewName === 'home') {
+                document.querySelector('nav a i.ph-house').classList.add('ph-fill', 'text-white');
+                document.getElementById('mobNavHome').classList.add('ph-fill', 'text-white');
+                document.getElementById('mobNavSearch').classList.remove('ph-fill', 'text-white');
+                document.getElementById('searchContainer').classList.add('hidden');
+            } else if (viewName === 'search') {
+                document.getElementById('searchNavIcon').classList.add('ph-fill', 'text-white');
+                document.getElementById('mobNavSearch').classList.add('ph-fill', 'text-white');
+                document.getElementById('mobNavHome').classList.remove('ph-fill', 'text-white');
+                document.getElementById('searchContainer').classList.remove('hidden');
+            } else {
+                document.getElementById('searchContainer').classList.add('hidden');
+            }
+
+            // Button highlights in player
+            document.getElementById('btnQueue').classList.toggle('text-spotify-green', viewName === 'queue');
+            document.getElementById('btnLyrics').classList.toggle('text-spotify-green', viewName === 'lyrics');
+            
+            // Specific initializers
+            if (viewName === 'queue') renderQueueView();
+            if (viewName === 'lyrics') renderLyricsView();
+
+            // Reset Scroll
+            document.getElementById('mainScrollArea').scrollTop = 0;
+        }
+
+        function historyBack() {
+            navigate('home');
+        }
+
+        function handleScroll() {
+            const area = document.getElementById('mainScrollArea');
+            const header = document.getElementById('mainHeader');
+            if (area.scrollTop > 50) {
+                header.classList.add('bg-spotify-base');
+                header.classList.remove('bg-transparent');
+            } else {
+                header.classList.remove('bg-spotify-base');
+                header.classList.add('bg-transparent');
+            }
+        }
+
+        function toggleMobileFullPlayer() {
+            // Se abrir no desktop e o player clicado, direciona pro Home
+            if(window.innerWidth >= 768) return; 
+
+            const isClosed = dom.mFull.classList.contains('translate-y-full');
+            if (isClosed) {
+                dom.mFull.classList.remove('translate-y-full');
+            } else {
+                dom.mFull.classList.add('translate-y-full');
+            }
+        }
+
+        // --- RENDERERS ---
+
+        function renderLibrary() {
+            const list = document.getElementById('libraryList');
+            let html = '';
+            
+            // Playlists Fixas
+            html += `
+                <div class="flex items-center gap-3 p-2 hover:bg-white/10 rounded-md cursor-pointer transition">
+                    <div class="w-12 h-12 rounded bg-gradient-to-br from-indigo-600 to-blue-300 flex items-center justify-center text-white shrink-0">
+                        <i class="ph-fill ph-heart text-xl"></i>
+                    </div>
+                    <div class="overflow-hidden">
+                        <p class="text-white font-bold text-[15px] truncate">Músicas Curtidas</p>
+                        <p class="text-sm text-spotify-text flex items-center gap-1"><i class="ph-fill ph-push-pin text-spotify-green text-xs"></i> Playlist • 120 músicas</p>
+                    </div>
+                </div>`;
+                
+            db.forEach(track => {
+                html += `
+                <div class="flex items-center gap-3 p-2 hover:bg-white/10 rounded-md cursor-pointer transition group" onclick="playTrack(${track.id - 1})">
+                    <img src="${track.cover}" class="w-12 h-12 rounded object-cover shrink-0">
+                    <div class="overflow-hidden flex-1">
+                        <p class="text-white font-medium text-[15px] truncate group-hover:text-spotify-green">${track.title}</p>
+                        <p class="text-sm text-spotify-text truncate">Single • ${track.artist}</p>
+                    </div>
+                </div>`;
+            });
+            list.innerHTML = html;
+        }
+
+        function renderHome() {
+            // Recent Grid
+            const recent = document.getElementById('homeRecentGrid');
+            recent.innerHTML = db.slice(0, 4).map(t => `
+                <div class="bg-white/5 hover:bg-white/20 transition flex items-center rounded overflow-hidden cursor-pointer group relative" onclick="playTrack(${t.id - 1})">
+                    <img src="${t.cover}" class="w-12 h-12 md:w-16 md:h-16 shadow-[0_0_10px_rgba(0,0,0,0.5)]">
+                    <div class="flex-1 px-3 font-bold text-white text-sm md:text-base truncate">${t.title}</div>
+                    <button class="absolute right-3 w-10 h-10 md:w-12 md:h-12 rounded-full bg-spotify-green text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-105 shadow-xl translate-y-2 group-hover:translate-y-0">
+                        <i class="ph-fill ph-play text-xl md:text-2xl ml-1"></i>
+                    </button>
+                </div>
+            `).join('');
+
+            // Made For you
+            const mfy = document.getElementById('homeMadeForYou');
+            mfy.innerHTML = db.map(t => `
+                <div class="bg-spotify-elevated hover:bg-spotify-highlight p-3 md:p-4 rounded-md transition cursor-pointer group" onclick="playTrack(${t.id - 1})">
+                    <div class="relative w-full aspect-square mb-4">
+                        <img src="${t.cover}" class="w-full h-full object-cover rounded shadow-lg">
+                        <button class="absolute bottom-2 right-2 w-10 h-10 md:w-12 md:h-12 rounded-full bg-spotify-green text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-105 shadow-xl translate-y-2 group-hover:translate-y-0">
+                            <i class="ph-fill ph-play text-xl ml-1"></i>
+                        </button>
+                    </div>
+                    <h3 class="text-white font-bold mb-1 truncate text-sm md:text-base">${t.title}</h3>
+                    <p class="text-xs md:text-sm text-spotify-text line-clamp-2">Mix com ${t.artist} e mais.</p>
+                </div>
+            `).join('');
+            
+            // Mixes copy
+            document.getElementById('homeMixes').innerHTML = mfy.innerHTML;
+        }
+
+        function renderSearchCategories() {
+            const colors = ['bg-red-500', 'bg-blue-600', 'bg-green-600', 'bg-yellow-500', 'bg-purple-600', 'bg-pink-600', 'bg-orange-500', 'bg-teal-600'];
+            const names = ['Podcasts', 'Feito para você', 'Lançamentos', 'Pop', 'Hip Hop', 'Rock', 'Latina', 'Treino'];
+            
+            const cat = document.getElementById('searchCategories');
+            cat.innerHTML = names.map((name, i) => `
+                <div class="rounded-lg ${colors[i % colors.length]} p-4 relative overflow-hidden aspect-square cursor-pointer hover:opacity-90 transition">
+                    <h3 class="text-white font-bold text-xl md:text-2xl">${name}</h3>
+                    <div class="absolute -bottom-2 -right-4 w-24 h-24 bg-black/20 rounded-lg transform rotate-[25deg]"></div>
+                </div>
+            `).join('');
+        }
+
+        function handleSearch() {
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            const btnClear = document.getElementById('clearSearchBtn');
+            const browse = document.getElementById('searchBrowseMode');
+            const results = document.getElementById('searchResultsMode');
+            
+            if (q.length > 0) {
+                btnClear.classList.remove('hidden');
+                browse.classList.add('hidden');
+                results.classList.remove('hidden');
+                
+                // Filter DB
+                const hits = db.filter(t => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q));
+                
+                if (hits.length > 0) {
+                    const top = hits[0];
+                    document.getElementById('topResultImg').src = top.cover;
+                    document.getElementById('topResultTitle').innerText = top.title;
+                    document.getElementById('topResultArtist').innerText = top.artist;
+                    document.querySelector('#searchResultsMode button').setAttribute('onclick', `playTrack(${top.id - 1})`);
+                    
+                    const list = document.getElementById('searchListResults');
+                    list.innerHTML = hits.map((t, index) => `
+                        <div class="flex items-center gap-4 px-4 py-2 hover:bg-white/10 rounded-md group cursor-pointer track-row" onclick="playTrack(${t.id - 1})">
+                            <img src="${t.cover}" class="w-10 h-10 rounded">
+                            <div class="flex-1 overflow-hidden">
+                                <p class="text-white font-medium truncate group-hover:underline">${t.title}</p>
+                                <p class="text-sm text-spotify-text truncate">${t.artist}</p>
+                            </div>
+                            <span class="text-sm text-spotify-text mr-4">${formatTime(t.duration)}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('searchListResults').innerHTML = `<p class="text-spotify-text py-4">Nenhum resultado para "${q}"</p>`;
+                }
+                
+            } else {
+                btnClear.classList.add('hidden');
+                browse.classList.remove('hidden');
+                results.classList.add('hidden');
+            }
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            handleSearch();
+            document.getElementById('searchInput').focus();
+        }
+
+        function playTrack(index) {
+            loadTrack(index);
+        }
+
+        // --- QUEUE MODULE ---
+        
+        function renderQueueView() {
+            const current = state.queue[state.currentTrackIndex];
+            if (!current) return;
+
+            document.getElementById('queueNowPlaying').innerHTML = `
+                <div class="flex items-center gap-4 px-2 py-1 group track-row cursor-pointer">
+                    <div class="w-4 h-4 flex items-center justify-center relative">
+                        <i class="ph-fill ph-speaker-high text-spotify-green track-num"></i>
+                        <i class="ph-fill ph-play text-white track-play"></i>
+                    </div>
+                    <img src="${current.cover}" class="w-10 h-10 rounded">
+                    <div class="flex-1">
+                        <p class="text-spotify-green font-bold text-base truncate">${current.title}</p>
+                        <p class="text-sm text-spotify-text truncate">${current.artist}</p>
+                    </div>
+                </div>
+            `;
+
+            const nextTracks = state.queue.slice(state.currentTrackIndex + 1);
+            const list = document.getElementById('queueList');
+            
+            if (nextTracks.length === 0) {
+                list.innerHTML = '<p class="text-spotify-text text-sm">A fila está vazia.</p>';
+            } else {
+                list.innerHTML = nextTracks.map((t, idx) => `
+                    <div class="flex items-center gap-4 px-2 py-2 hover:bg-white/10 rounded group cursor-pointer track-row transition" onclick="playTrack(${state.currentTrackIndex + 1 + idx})">
+                        <div class="w-4 h-4 flex items-center justify-center text-spotify-text text-sm group-hover:text-white">
+                            <span class="track-num">${idx + 1}</span>
+                            <i class="ph-fill ph-play track-play text-white"></i>
+                        </div>
+                        <img src="${t.cover}" class="w-10 h-10 rounded object-cover">
+                        <div class="flex-1 overflow-hidden">
+                            <p class="text-white font-medium truncate group-hover:underline">${t.title}</p>
+                            <p class="text-sm text-spotify-text truncate">${t.artist}</p>
+                        </div>
+                        <p class="text-sm text-spotify-text hidden md:block">${t.album}</p>
+                        <p class="text-sm text-spotify-text mr-4">${formatTime(t.duration)}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // --- LYRICS MODULE ---
+        
+        function renderLyricsView() {
+            const container = document.getElementById('lyricsContainer');
+            if (!state.isPlaying && state.currentTime === 0) {
+                // Not playing yet
+                return;
+            }
+            document.getElementById('lyricsFallback').classList.add('hidden');
+            
+            // Build text DOM
+            container.innerHTML = mockLyrics.map((l, i) => `
+                <p id="lyric-${i}" class="text-3xl md:text-5xl font-bold text-spotify-text lyric-line mb-6 cursor-pointer" onclick="seekLyric(${l.t})">${l.text}</p>
+            `).join('');
+            
+            syncLyrics(); // Run once immediately
+        }
+
+        function syncLyrics() {
+            if (state.currentView !== 'lyrics') return;
+            const time = state.currentTime;
+            
+            // Find current line
+            let activeIndex = 0;
+            for (let i = 0; i < mockLyrics.length; i++) {
+                if (time >= mockLyrics[i].t) {
+                    activeIndex = i;
+                } else {
+                    break;
+                }
+            }
+
+            // Remove class from all
+            document.querySelectorAll('.lyric-line').forEach((el, i) => {
+                if (i === activeIndex) {
+                    el.classList.add('lyric-active');
+                    // Auto scroll (smooth)
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    el.classList.remove('lyric-active');
+                }
+            });
+        }
+
+        function seekLyric(seconds) {
+            dom.audio.currentTime = seconds;
+            if(!state.isPlaying) playAudio();
+        }
+
+        // --- CAST MODULE ---
+        
+        function openCastModal() {
+            const modal = document.getElementById('castModal');
+            const content = document.getElementById('castModalContent');
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                content.classList.remove('scale-95');
+                content.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeCastModal(e) {
+            const modal = document.getElementById('castModal');
+            const content = document.getElementById('castModalContent');
+            content.classList.remove('scale-100');
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            }, 300);
+        }
+
+        function simulateCast(device) {
+            closeCastModal();
+            showToast(`Conectando ao ${device}...`);
+            
+            setTimeout(() => {
+                state.castDevice = device;
+                showToast(`Reproduzindo em: ${device}`);
+                document.getElementById('castActiveDot').classList.remove('hidden');
+                document.getElementById('mobCastIcon').classList.add('text-spotify-green');
+                document.querySelector('.ph-screencast').classList.add('text-spotify-green');
+                
+                // Diminue o volume local para simular cast
+                setVolume(0);
+            }, 1500);
+        }
+
+        // --- UTILS ---
+        
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "0:00";
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('translate-y-10', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0');
+            }, 3500);
+        }
+
+        // --- INIT APP ---
+        window.addEventListener('DOMContentLoaded', () => {
+            renderLibrary();
+            renderHome();
+            renderSearchCategories();
+            setVolume(1);
+            
+            // Set first track data without playing
+            state.queue = [...db];
+            state.originalQueue = [...db];
+            state.currentTrackIndex = 0;
+            updatePlayerUI(db[0]);
+            
+            // Focus hack to clear focus rings
+            document.body.focus();
+        });
+
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+primeiro, quando eu baixo uma música e fecho o app, ela não aparece como "Baixada" e sai do album de musicas baixadas. Toda vez que clico no google cast o app fecha na hora:
+
+2026-07-16 00:28:41.337   610-610   View                    com.example.exlify                   I  setRequestedFrameRate frameRate=-4.0, this=android.view.View{b7b9b35 V.ED..... ........ 0,0-0,0}, caller=androidx.compose.ui.platform.Api35Impl.setRequestedFrameRate:3314 androidx.compose.ui.platform.AndroidComposeView.dispatchDraw:1950 android.view.View.draw:26345 android.view.View.updateDisplayListIfDirty:25175 android.view.ViewGroup.recreateChildDisplayList:4794 
+2026-07-16 00:28:41.345   610-610   View                    com.example.exlify                   I  setRequestedFrameRate frameRate=NaN, this=androidx.compose.ui.platform.AndroidComposeView{5d4cf66 VFED..... ........ 0,0-1080,2316 aid=1073741824}, caller=android.view.ViewGroup.setRequestedFrameRate:9952 androidx.compose.ui.platform.Api35Impl.setRequestedFrameRate:3314 androidx.compose.ui.platform.AndroidComposeView.dispatchDraw:1949 android.view.View.draw:26345 android.view.View.updateDisplayListIfDirty:25175 
+2026-07-16 00:28:41.345   610-610   View                    com.example.exlify                   I  setRequestedFrameRate frameRate=NaN, this=android.view.View{b7b9b35 V.ED..... ........ 0,0-0,0}, caller=androidx.compose.ui.platform.Api35Impl.setRequestedFrameRate:3314 androidx.compose.ui.platform.AndroidComposeView.dispatchDraw:1950 android.view.View.draw:26345 android.view.View.updateDisplayListIfDirty:25175 android.view.ViewGroup.recreateChildDisplayList:4794 
+2026-07-16 00:28:41.346   610-785   BufferQueueProducer     com.example.exlify                   E  [SurfaceTexture-1-610-0](id:26200000001,api:3,p:610,c:610) dequeueBuffer: waitForFreeSlotThenRelock: timeout. dequeuedCount: 19, acquiredCount: 0, mDequeueTimeout: 0
+2026-07-16 00:28:41.353   610-610   View                    com.example.exlify                   I  setRequestedFrameRate frameRate=NaN, this=androidx.compose.ui.platform.AndroidComposeView{5d4cf66 VFED..... ........ 0,0-1080,2316 aid=1073741824}, caller=android.view.ViewGroup.setRequestedFrameRate:9952 androidx.compose.ui.platform.Api35Impl.setRequestedFrameRate:3314 androidx.compose.ui.platform.AndroidComposeView.dispatchDraw:1949 android.view.View.draw:26345 android.view.View.updateDisplayListIfDirty:25175 
+2026-07-16 00:28:41.353   610-610   View                    com.example.exlify                   I  setRequestedFrameRate frameRate=-4.0, this=android.view.View{b7b9b35 V.ED..... ........ 0,0-0,0}, caller=androidx.compose.ui.platform.Api35Impl.setRequestedFrameRate:3314 androidx.compose.ui.platform.AndroidComposeView.dispatchDraw:1950 android.view.View.draw:26345 android.view.View.updateDisplayListIfDirty:25175 android.view.ViewGroup.recreateChildDisplayList:4794 
+2026-07-16 00:28:41.356   610-610   VRI[MainAc...y]@49a8342 com.example.exlify                   I  ViewPostIme pointer 1
+2026-07-16 00:28:41.362   610-610   View                    com.example.exlify                   I  setRequestedFrameRate frameRate=NaN, this=androidx.compose.ui.platform.AndroidComposeView{5d4cf66 VFED..... ........ 0,0-1080,2316 aid=1073741824}, caller=android.view.ViewGroup.setRequestedFrameRate:9952 androidx.compose.ui.platform.Api35Impl.setRequestedFrameRate:3314 androidx.compose.ui.platform.AndroidComposeView.dispatchDraw:1949 android.view.View.draw:26345 android.view.View.updateDisplayListIfDirty:25175 
+2026-07-16 00:28:41.362   610-610   View                    com.example.exlify                   I  setRequestedFrameRate frameRate=-4.0, this=android.view.View{b7b9b35 V.ED..... ........ 0,0-0,0}, caller=androidx.compose.ui.platform.Api35Impl.setRequestedFrameRate:3314 androidx.compose.ui.platform.AndroidComposeView.dispatchDraw:1950 android.view.View.draw:26345 android.view.View.updateDisplayListIfDirty:25175 android.view.ViewGroup.recreateChildDisplayList:4794 
+2026-07-16 00:28:41.365   610-610   AndroidRuntime          com.example.exlify                   D  Shutting down VM
+2026-07-16 00:28:41.366   610-610   AndroidRuntime          com.example.exlify                   E  FATAL EXCEPTION: main
+                                                                                                    Process: com.example.exlify, PID: 610
+                                                                                                    java.lang.IllegalStateException: The activity must be a subclass of FragmentActivity
+                                                                                                    	at androidx.mediarouter.app.MediaRouteButton.showDialogForType(MediaRouteButton.java:328)
+                                                                                                    	at androidx.mediarouter.app.MediaRouteButton.showDialog(MediaRouteButton.java:321)
+                                                                                                    	at androidx.mediarouter.app.MediaRouteButton.performClick(MediaRouteButton.java:407)
+                                                                                                    	at android.view.View.performClickInternal(View.java:8485)
+                                                                                                    	at android.view.View.-$$Nest$mperformClickInternal(View.java:0)
+                                                                                                    	at android.view.View$PerformClick.run(View.java:33213)
+                                                                                                    	at android.os.Handler.handleCallback(Handler.java:995)
+                                                                                                    	at android.os.Handler.dispatchMessage(Handler.java:103)
+                                                                                                    	at android.os.Looper.loopOnce(Looper.java:273)
+                                                                                                    	at android.os.Looper.loop(Looper.java:363)
+                                                                                                    	at android.app.ActivityThread.main(ActivityThread.java:10060)
+                                                                                                    	at java.lang.reflect.Method.invoke(Native Method)
+                                                                                                    	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:632)
+                                                                                                    	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:975)
+2026-07-16 00:28:41.378   610-610   Process                 com.example.exlify                   I  Sending signal. PID: 610 SIG: 9
+---------------------------- PROCESS ENDED (610) for package com.example.exlify ----------------------------
+
+
+a fonte dos inputs das playlists, busca e etc estão cortadas, conserte isso e deixe os cantos com 2px de curva. Não aparecem músicas nos canais, eu quero que faça a pesquisa da busca sendo que lá listando os mais populares daquele artista, e que possa segui-los (ao estar logado), ao segui-los mostre na biblioteca do usuário, e quero que nos 3 pontinhos nas músicas tenha um timer, tipo, a o player pare em 5, 10, 15, 20, 25, 30 minutos ou até a música acabar. Quero que coloque um ícone de compartilhar para compartilhar a playlist com outras pessoas, usando o link do ngrok (https://euphemiously-encephalitic-shantae.ngrok-free.dev), e que possa importar mídias usando arquivos CSV ou pondo o link do vídeo no youtube. Adicione o nome Apagar na busca ao lado de buscas recentes no lado direito, ao clicar ele pergunte se quer apagar as buscas recentes, aí apague. Quero também que busque os usuários da plataforma na busca, na busca tenha mais uma opção depois de canais/artistas, seja Usuários, aí possa buscar, ao achar vá para o perfil deles, mostre as playlists públicas, possa entrar e salvar, aí fica na minha biblioteca, eu possa tirar mas não possa excluir nada nem mexer nada, e qualquer coisinha que ele fizer mude para mim também. Mandei meu script.js para mostrar como fiz no meu site, Adicione fotos aos artistas na tela inicial e nos podcasts, e tire o nome Youtube de tudo menos de onde importa. Adícione ícones nas seções da busca, nos quadrados coloque um ícone de microfone em Podcasts por exemplo, entendeu? E se possível quero que possa buscar playlists do youtube, seria muito bom, pode dar um jeito? me mande meu código completo sem remover absolutamente nada, nem uma vírgula sequer do meu código.
+
+certo, mas quero que você coloque mais funções, mais opções... entende? coisas que o soptify tem por exemplo, me surpreenda, recheie meu site com elas, seja o mais diversificado possível. Quero que possa ver playlists que já existem, os cliques direitos do mouse funcionem para excluir ou editar playlists, possa excluir artistas e etc, deixe bem usável para computadores e celulares. Quero que tenha mais configurações, e faça uma página inicial falando sobre o site e app,  com um design incrível e profissional. se chamará inicio.html, e para ir lá tenha outra opção do lado direito de onde busca, lá tem uma casinha para ir para o início, e lá do lado direito tenha uma interrogação que leve para a página. Quero que possa adicionar a música que estou ouvindo pela barra de música em telas maiores, ou coloque os 3 pontinhos.
+
+certo, agora eu quero que você implemente algumas coisas, a primeira é que quando estiver com o celular ou dispositivo desligado tocando em segundo plano, nunca trave, sempre carregue a próxima e a música atual para nao quebrar a faixa. E eu botei o google cast né? masn o iphone não tem, então coloque o airplay para dispositivos ios, que funcionem muito bem em ambos, no google cast e airplay mostrem a thumb, o nome e possa controlar a mídia normalmente. Bem profissional. E tenha a aparência parecida com a imagem, quando estiver no dispositivo fique desse jeito, mas se tiver em outro mostre lá. E quero que tire todos os alerts do site, e substitua por um modal o card bem bonito. Adicione animações em basicamente tudo, bem leve, suave e fluido. e possa desativar nas configurações como já tem. E ao fazer login, onde na navbar em telas menores tinha o botão de fazer login, substitua por um ícone de + e Criar, e tenha a aparência que mandei no menu (metade bottom sheet) que abrirá na parte inferior em telas menores, Tenha a opção de Criar playlists, Álbum personalizado com músicas das minhas playlists (crie uma playlist para o usuário com até 15 músicas variadas que ele tem nas playlists dele) e ao pôr o nome da playlist e definir se é pública ou privada, tenha a aparência da imagem somente em telas menores, em telas maiores mantenha do jeito que está. Por fim quero que otimize o tempo de entrega do aúdio ao usuário o melhore e mais profissional possível, use bons métodos, diminua o consumo de dados que o usuário precisaria ter, entregue uma aplicação mais imediata possível. E conserte a busca, pois tem vezes que ela trava. E quero que os 3 pontinhos do player aberto em telas menores funcione.
+aqui as imagens, perdão por não mandar antes, me mande tudo logo, já funcionando. E quero que tenha uma opção igual a do spotify em telas maiores, que ao clicar abra um card na tela do usuário que fique lá, redimensione para o tamanho que quiser e seja responsivo, sirva para pausar, passar ou retroceder para a música anterior ou posterior. mostre a música que está passando e tudo mais. E quero que tenha algo que lide com usuários diversos, pois tem um que clica em uma música e já clica em outra, aí buga e ele diz que está tocando uma coisa mas na verdade está tocando outra. Me mande meu código completo com tudo funcionando.
+
+quero que toda imagem enviada para foto de perfil ou playlist tenha um formato bem leve, preservando mais a leveza que a qualidade, e quero que na midia do dispositivo do usuário, em vez de pular 10 ou voltar 10 segundos, possa ir para a próxima música ou voltar para a anterior. 
+
+quero que no histórico de busca não apareça minhas pesquisas de nome, mas as músicas que eu ouvi por lá, igual o spotify faz, entendeu? Quero que nas configurações, em vez de ser tudo bagunçado, abra na tela toda uma parte onde tenha "conta, armazenamento, personalização, Economia, Qualidade de mídia e etc" entendeu? Quero que a maioria das músicas tenham letra, e que vá acompanhando conforme a música for rolando. Quero que no + ou em telas maiores tenha uma opção para criar uma playlist colaborativa, onde o usuário enviará um link para alguém e quem entrar por aquele link aparecerá uma mensagem igual quando alguem manda uma playlist, mas tenha "somente ver" ou "fazer parte", aí eles poderão gerenciar a playlist, o usuário poderá sair quando quiser, e quem criou não poderá sair, mas excluir e gerenciar quem está lá. Quero que o usuário possa ver o próprio perfil, e quero que o menu dos 3 pontinhos ou quando apertar na foto do usuário em telas menores seja um bottom sheet, onde tiver opções em telas menores possa ser bottom sheet. em telas maiores deixe como está. Quero que onde mostra a fila, tenha um scroll nas músicas para não achatá-las no layout, e quero que melhore ao maximo a responsividade do site e da janela flutuante, quero que ela possa ser retrato ou paisagem, o usuário que define, e quero que ela possa ficar na tela do usuário como uma nova guia, entende? possa ficar na tela dele enquanto trabalha ou joga. e quero que nas playlists ao lado do ícone de compartilhar tenha um ícone de download, ao clicar abra um card em baixo dizendo que esta função está em desenvolvimento. E falando nisso diminua um pouco o tamanho dos ícones, tipo 5% do que já está. E quero que melhore a aparência de tudo como um todo, tanto na acessibilidade quanto nos efeitos, que está em falta, quero que tenha animação ao fechar janelas, abrir coisas, ao fechar ou abrir a visualização de reproducação e etc, quero que tire a opção de fazer login com google. E quero que na página inicial tenha recomendações, como se fosse um algoritmo, de acordo com os canais, pesquisas e músicas que o usuário ouviu, entendeu? E quero que otimize o tempo de entrega, ao conseguir o audio já toque IMEDIATAMENTE para o usuário, sem atraso algum, entendeu? me mande meu código completo para eu colar por cima do meu atual.

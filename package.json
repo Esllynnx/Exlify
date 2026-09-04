@@ -1,15 +1,25 @@
 {
-  "name": "yt-audio-proxy",
+  "name": "teste",
   "version": "1.0.0",
-  "type": "module",
+  "description": "",
   "main": "server.js",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
+    "axios": "^1.18.1",
     "cors": "^2.8.6",
-    "express": "^4.22.1",
-    "node-fetch": "^3.3.2",
-    "youtube-dl-exec": "^3.0.29"
+    "express": "^5.2.1",
+    "yt-dlp-exec": "^1.0.2",
+    "yt-search": "^2.13.1",
+    "ytdl-core": "^4.11.5"
   }
 }

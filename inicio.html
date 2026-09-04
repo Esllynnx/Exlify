@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-title" content="Exlify">
+<link rel="apple-touch-icon" href="logo.png">
+<link rel="icon" type="image/png" href="logo.png">
+<title>Exlify — Sua plataforma de música, sem interrupções</title>
+<meta name="description" content="Exlify é a sua plataforma de música: pesquise qualquer faixa, organize sua biblioteca em playlists e ouça sem anúncios — no computador, no celular ou instalado como app.">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Exlify — Sua plataforma de música, sem interrupções">
+<meta property="og:description" content="Pesquise, organize e ouça sem anúncios. Sua biblioteca musical, em qualquer tela.">
+<meta property="og:image" content="logo2.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                fontFamily: { sans: ['Figtree', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+                colors: {
+                    spotify: {
+                        green: '#1ed760',
+                        greenHover: '#1fdf64',
+                        black: '#000000',
+                        base: '#121212',
+                        highlight: '#1a1a1a',
+                        elevated: '#242424',
+                        card: '#181818',
+                        cardHover: '#282828',
+                        text: '#b3b3b3',
+                        textWhite: '#ffffff'
+                    }
+                }
+            }
+        }
+    }
+</script>
+
+<style>
+    :root{ --accent-dim: rgba(30,215,96,.14); --line: rgba(255,255,255,.08); }
+    html{ scroll-behavior: smooth; }
+    body{ background:#000; -webkit-font-smoothing: antialiased; overscroll-behavior-y:none; }
+    ::selection{ background:#1ed760; color:#001a08; }
+    :focus-visible{ outline:2px solid #1ed760; outline-offset:3px; border-radius:6px; }
+    ::-webkit-scrollbar{ width:10px; height:10px; }
+    ::-webkit-scrollbar-track{ background:transparent; }
+    ::-webkit-scrollbar-thumb{ background-color:hsla(0,0%,100%,.15); border-radius:8px; }
+
+    .eyebrow{
+        font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600;
+        letter-spacing:.14em; text-transform:uppercase; color:#1ed760;
+        display:inline-flex; align-items:center; gap:8px;
+    }
+    .eyebrow::before{ content:''; width:6px; height:6px; border-radius:50%; background:#1ed760; box-shadow:0 0 0 3px var(--accent-dim); }
+
+    .kk{
+        font-family:'JetBrains Mono',monospace; font-weight:600; font-size:12.5px;
+        background:#181818; border:1px solid var(--line); border-bottom-width:2px;
+        border-radius:6px; padding:5px 9px; color:#fff; display:inline-flex; min-width:26px;
+        align-items:center; justify-content:center;
+    }
+
+    /* ===== Reveal on scroll ===== */
+    .reveal{ opacity:0; transform:translateY(18px); transition:opacity .6s cubic-bezier(.22,1,.36,1), transform .6s cubic-bezier(.22,1,.36,1); }
+    .reveal.in{ opacity:1; transform:translateY(0); }
+
+    /* ===== Hero ambient glow ===== */
+    .glow{
+        position:absolute; inset:0; pointer-events:none; z-index:0;
+        background:
+            radial-gradient(60% 50% at 80% 0%, rgba(30,215,96,.16), transparent 60%),
+            radial-gradient(40% 40% at 10% 20%, rgba(30,215,96,.08), transparent 60%);
+    }
+
+    /* ===== Hero product mockup ===== */
+    .mock-card{
+        background:linear-gradient(180deg,#161616 0%, #0a0a0a 100%);
+        border:1px solid var(--line);
+        border-radius:20px;
+        box-shadow: 0 30px 80px -20px rgba(0,0,0,.7);
+    }
+    .mock-thumb{
+        width:44px; height:44px; border-radius:6px; flex-shrink:0;
+        display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.55); font-size:16px;
+    }
+    .mock-row{ transition: background-color .2s ease; }
+    .mock-row:hover{ background:#1a1a1a; }
+    .mock-row.is-active{ background:#1a1a1a; }
+
+    .art-spin{ animation: spin 14s linear infinite; }
+    @keyframes spin{ to{ transform: rotate(360deg); } }
+
+    .bar-progress{
+        position:relative; height:3px; border-radius:99px; background:#3d3d3d; overflow:hidden;
+    }
+    .bar-progress > span{
+        position:absolute; inset:0 auto 0 0; width:35%; background:#1ed760; border-radius:99px;
+        animation: fillTrack 18s linear infinite;
+    }
+    @keyframes fillTrack{
+        0%{ width:4%; } 100%{ width:96%; }
+    }
+
+    .eq-mini{ display:flex; align-items:flex-end; gap:2px; height:14px; }
+    .eq-mini i{ width:3px; background:#1ed760; border-radius:2px; animation:eqBounce 1s ease-in-out infinite; }
+    .eq-mini i:nth-child(1){ animation-delay:-.6s; } .eq-mini i:nth-child(2){ animation-delay:-.2s; }
+    .eq-mini i:nth-child(3){ animation-delay:-.9s; } .eq-mini i:nth-child(4){ animation-delay:-.35s; }
+    @keyframes eqBounce{ 0%,100%{ height:3px; } 50%{ height:14px; } }
+
+    .pulse-dot{ position:relative; width:7px; height:7px; border-radius:50%; background:#1ed760; }
+    .pulse-dot::after{
+        content:''; position:absolute; inset:-5px; border-radius:50%; border:1px solid #1ed760;
+        animation: pulseRing 1.8s ease-out infinite;
+    }
+    @keyframes pulseRing{ 0%{ transform:scale(.5); opacity:.9; } 100%{ transform:scale(1.8); opacity:0; } }
+
+    /* ===== Equalizer stage (não interrompido) ===== */
+    .wave-track{ overflow:hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+    .wave-strip{ display:flex; align-items:center; gap:4px; width:max-content; animation: waveScroll 16s linear infinite; }
+    .wave-strip i{ width:3px; border-radius:2px; background:linear-gradient(180deg,#1ed760,#0c3a1f); flex-shrink:0; }
+    @keyframes waveScroll{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
+
+    /* ===== Bento cards ===== */
+    .card{
+        background:#121212; border:1px solid var(--line); border-radius:16px; padding:26px;
+        transition: border-color .25s ease, transform .25s cubic-bezier(.22,1,.36,1);
+        display:flex; flex-direction:column; gap:12px;
+    }
+    .card:hover{ border-color:rgba(255,255,255,.22); transform:translateY(-3px); }
+    .card .ic{
+        width:40px; height:40px; border-radius:10px; background:var(--accent-dim); color:#1ed760;
+        display:flex; align-items:center; justify-content:center; font-size:19px;
+    }
+    .c-span-4{ grid-column:span 4; } .c-span-2{ grid-column:span 2; }
+
+    /* ===== Gestos: phone demo ===== */
+    .phone{
+        width:230px; height:400px; border-radius:34px; background:#0a0a0a; border:1px solid rgba(255,255,255,.14);
+        padding:10px; box-shadow:0 30px 70px -20px rgba(0,0,0,.8); position:relative; margin:0 auto;
+    }
+    .phone-screen{
+        width:100%; height:100%; border-radius:26px; overflow:hidden; position:relative;
+        background:linear-gradient(160deg,#151515,#0a0a0a);
+        display:flex; align-items:center; justify-content:center;
+    }
+    .phone-art{
+        width:130px; height:130px; border-radius:14px;
+        background:linear-gradient(135deg,#1a1a1a,#0c3a1f 140%);
+        display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.35); font-size:30px;
+        position:relative;
+    }
+    .swipe-hint{
+        position:absolute; top:50%; left:50%; width:26px; height:26px; margin:-13px 0 0 -13px;
+        border-radius:50%; background:rgba(255,255,255,.9);
+        animation: swipeMove 3.2s ease-in-out infinite;
+        box-shadow:0 4px 14px rgba(0,0,0,.4);
+    }
+    @keyframes swipeMove{
+        0%,100%{ transform:translateX(-58px); opacity:0; }
+        12%{ opacity:1; }
+        45%{ transform:translateX(58px); opacity:1; }
+        58%{ opacity:0; }
+    }
+    .press-ring{
+        position:absolute; bottom:26px; left:50%; width:34px; height:34px; margin-left:-17px;
+        border-radius:50%; border:2px solid #1ed760; animation: pressPulse 2.6s ease-in-out infinite;
+    }
+    @keyframes pressPulse{
+        0%{ transform:scale(.4); opacity:0; } 30%{ opacity:1; } 55%{ transform:scale(1.5); opacity:0; } 100%{ opacity:0; }
+    }
+
+    .gesture-row{ display:flex; gap:16px; align-items:flex-start; padding:16px 0; border-top:1px solid var(--line); }
+    .gesture-row:first-child{ border-top:none; }
+
+    /* ===== Shortcuts panel ===== */
+    .sc-row{ display:flex; align-items:center; justify-content:space-between; padding:12px 2px; border-bottom:1px solid var(--line); font-size:14.5px; }
+    .sc-row:last-child{ border-bottom:none; }
+
+    /* ===== Responsive ===== */
+    @media (max-width:1024px){
+        .c-span-4, .c-span-2{ grid-column:span 3; }
+        .hero-grid{ grid-template-columns:1fr; }
+    }
+    @media (max-width:640px){
+        .c-span-4, .c-span-2{ grid-column:span 6; }
+    }
+
+    @media (prefers-reduced-motion: reduce){
+        html{ scroll-behavior:auto; }
+        .reveal{ opacity:1; transform:none; transition:none; }
+        .art-spin, .bar-progress > span, .eq-mini i, .pulse-dot::after, .wave-strip, .swipe-hint, .press-ring{ animation:none !important; }
+    }
+</style>
+</head>
+<body class="bg-black text-white font-sans">
+
+    <!-- ============ NAV ============ -->
+    <header class="sticky top-0 z-50 bg-black/70 backdrop-blur-xl border-b border-white/[0.08]">
+        <div class="max-w-[1180px] mx-auto px-6 h-[72px] flex items-center justify-between">
+            <a href="inicio.html" class="flex items-center gap-2.5">
+                <img src="logo2.png" alt="Exlify" class="h-6">
+            </a>
+            <nav class="hidden md:flex items-center gap-8 text-[14px] font-semibold text-spotify-text">
+                <a href="#recursos" class="hover:text-white transition">Recursos</a>
+                <a href="#gestos" class="hover:text-white transition">Gestos &amp; atalhos</a>
+                <a href="#como-funciona" class="hover:text-white transition">Como funciona</a>
+                <a href="#plataformas" class="hover:text-white transition">Plataformas</a>
+            </nav>
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="hidden sm:inline-flex items-center gap-2 bg-spotify-green hover:bg-spotify-greenHover text-black font-bold text-[14px] px-[22px] py-3 rounded-full transition hover:scale-[1.03]">
+                    <i class="ph-fill ph-play"></i> Abrir o Exlify
+                </a>
+                <button id="menuBtn" class="md:hidden w-10 h-10 flex items-center justify-center text-white" aria-label="Abrir menu">
+                    <i class="ph-bold ph-list text-2xl"></i>
+                </button>
+            </div>
+        </div>
+        <div id="mobileMenu" class="hidden md:hidden border-t border-white/[0.08] bg-black px-6 py-5 flex flex-col gap-4 text-[15px] font-semibold">
+            <a href="#recursos" class="text-spotify-text hover:text-white">Recursos</a>
+            <a href="#gestos" class="text-spotify-text hover:text-white">Gestos &amp; atalhos</a>
+            <a href="#como-funciona" class="text-spotify-text hover:text-white">Como funciona</a>
+            <a href="#plataformas" class="text-spotify-text hover:text-white">Plataformas</a>
+            <a href="index.html" class="inline-flex items-center justify-center gap-2 bg-spotify-green text-black font-bold px-5 py-3 rounded-full mt-1">
+                <i class="ph-fill ph-play"></i> Abrir o Exlify
+            </a>
+        </div>
+    </header>
+
+    <main>
+        <!-- ============ HERO ============ -->
+        <section class="relative overflow-hidden pt-16 pb-20 md:pt-24 md:pb-24">
+            <div class="glow"></div>
+            <div class="max-w-[1180px] mx-auto px-6 relative z-10">
+                <div class="hero-grid grid grid-cols-1 md:grid-cols-[1.05fr_0.95fr] gap-12 items-center">
+                    <div>
+                        <span class="eyebrow reveal in">Plataforma de música</span>
+                        <h1 class="font-sans font-[800] text-[42px] leading-[1.02] tracking-tight md:text-[68px] mt-5 mb-6 reveal in">
+                            Sua música,<br>de <span class="text-spotify-green">ponta a ponta.</span>
+                        </h1>
+                        <p class="text-[17px] md:text-[18px] text-spotify-text max-w-[480px] mb-8 reveal in">
+                            Exlify é onde sua música vive: pesquise qualquer faixa, monte sua biblioteca do seu jeito e deixe tocar — uma música direto na outra, sem anúncio cortando o clima.
+                        </p>
+                        <div class="flex flex-wrap gap-3 mb-10 reveal in">
+                            <a href="index.html" class="inline-flex items-center gap-2 bg-spotify-green hover:bg-spotify-greenHover text-black font-bold text-[15px] px-7 py-4 rounded-full transition hover:-translate-y-0.5 hover:scale-[1.02]">
+                                <i class="ph-fill ph-play"></i> Abrir o Exlify
+                            </a>
+                            <a href="#recursos" class="inline-flex items-center gap-2 border border-white/15 hover:border-white/35 text-white font-bold text-[15px] px-7 py-4 rounded-full transition hover:-translate-y-0.5">
+                                <i class="ph-bold ph-arrow-down"></i> Explorar a plataforma
+                            </a>
+                        </div>
+                        <div class="flex flex-wrap gap-x-7 gap-y-3 font-mono text-[12.5px] text-spotify-text reveal in">
+                            <span class="flex items-center gap-2"><i class="ph-bold ph-lightning text-spotify-green"></i> Busca instantânea</span>
+                            <span class="flex items-center gap-2"><i class="ph-bold ph-prohibit text-spotify-green"></i> Zero anúncios</span>
+                            <span class="flex items-center gap-2"><i class="ph-bold ph-monitor text-spotify-green"></i> Em qualquer tela</span>
+                            <span class="flex items-center gap-2"><i class="ph-bold ph-arrow-square-down text-spotify-green"></i> Instalável</span>
+                        </div>
+                    </div>
+
+                    <!-- MOCKUP DA PLATAFORMA -->
+                    <div class="mock-card p-4 md:p-5 reveal in" aria-hidden="true">
+                        <div class="flex items-center gap-2 bg-[#181818] border border-white/[0.06] rounded-full px-4 py-3 mb-4">
+                            <i class="ph-bold ph-magnifying-glass text-spotify-text"></i>
+                            <span class="text-spotify-text text-[13.5px]">O que você quer ouvir?</span>
+                        </div>
+
+                        <div class="flex flex-col gap-0.5 mb-3">
+                            <div class="mock-row is-active flex items-center gap-3 px-2 py-2.5 rounded-lg">
+                                <div class="mock-thumb bg-gradient-to-br from-[#1ed760] to-[#0c3a1f]"><div class="eq-mini"><i></i><i></i><i></i><i></i></div></div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-white text-[13.5px] font-semibold truncate">Rotas Noturnas</p>
+                                    <p class="text-spotify-text text-[12px] truncate">Anelize Costa</p>
+                                </div>
+                                <i class="ph-fill ph-heart text-spotify-green text-[15px]"></i>
+                            </div>
+                            <div class="mock-row flex items-center gap-3 px-2 py-2.5 rounded-lg">
+                                <div class="mock-thumb bg-gradient-to-br from-[#3b3b3b] to-[#161616]"><i class="ph-fill ph-music-note"></i></div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-white text-[13.5px] font-semibold truncate">Deriva</p>
+                                    <p class="text-spotify-text text-[12px] truncate">Coletivo Sul</p>
+                                </div>
+                                <span class="text-spotify-text text-[12px] font-mono">3:24</span>
+                            </div>
+                            <div class="mock-row flex items-center gap-3 px-2 py-2.5 rounded-lg">
+                                <div class="mock-thumb bg-gradient-to-br from-[#3b3b3b] to-[#161616]"><i class="ph-fill ph-music-note"></i></div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-white text-[13.5px] font-semibold truncate">Sala 12</p>
+                                    <p class="text-spotify-text text-[12px] truncate">Marin Reis</p>
+                                </div>
+                                <span class="text-spotify-text text-[12px] font-mono">2:57</span>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-white/[0.06] pt-4 flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-md bg-gradient-to-br from-[#1ed760] to-[#0c3a1f] art-spin flex items-center justify-center text-black/40 text-[13px]"><i class="ph-fill ph-vinyl-record"></i></div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-white text-[13px] font-semibold truncate">Rotas Noturnas</p>
+                                <div class="bar-progress mt-2"><span></span></div>
+                            </div>
+                            <span class="flex items-center gap-1.5 text-[10.5px] font-mono text-spotify-green shrink-0">
+                                <span class="pulse-dot"></span> AO VIVO
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ SEM INTERRUPÇÕES ============ -->
+        <section class="border-t border-white/[0.08] py-20 md:py-24">
+            <div class="max-w-[1180px] mx-auto px-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                    <div class="reveal">
+                        <span class="eyebrow">Zero anúncios</span>
+                        <h2 class="font-[800] text-[32px] md:text-[42px] tracking-tight leading-[1.05] mt-4 mb-5">Uma faixa termina.<br>A próxima já começa.</h2>
+                        <p class="text-spotify-text text-[16px] max-w-[440px]">Enquanto outros serviços cortam sua playlist pra encaixar propaganda, o Exlify mantém a fila rodando. Busque, organize e deixe a música seguir — sem pausa forçada, sem contagem regressiva.</p>
+                    </div>
+                    <div class="reveal">
+                        <div class="wave-track h-32 flex items-center">
+                            <div class="wave-strip" id="waveStrip"></div>
+                        </div>
+                        <p class="text-center font-mono text-[12px] text-spotify-text mt-4">sem cortes · sem contagem regressiva · só a próxima faixa</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ RECURSOS ============ -->
+        <section id="recursos" class="border-t border-white/[0.08] py-20 md:py-24">
+            <div class="max-w-[1180px] mx-auto px-6">
+                <div class="max-w-[620px] mb-12 reveal">
+                    <span class="eyebrow">Recursos</span>
+                    <h2 class="font-[800] text-[30px] md:text-[42px] tracking-tight mt-4">Tudo o que sua música precisa, num só lugar.</h2>
+                    <p class="text-spotify-text text-[16px] mt-3">Sem menus escondidos, sem passos extras. Cada recurso fica a um clique — ou a um gesto — de distância.</p>
+                </div>
+
+                <div class="grid grid-cols-6 gap-4">
+                    <div class="card c-span-4 reveal" style="background:linear-gradient(155deg,#121212 0%, #0a140e 100%);">
+                        <div class="ic"><i class="ph-bold ph-magnifying-glass"></i></div>
+                        <h3 class="font-[700] text-[19px]">Busca instantânea</h3>
+                        <p class="text-spotify-text text-[14px] leading-relaxed">Resultados aparecem enquanto você digita. Pesquisas recentes ficam salvas, prontas pra tocar de novo num toque — sem esperar a página recarregar.</p>
+                        <div class="mt-auto flex items-center gap-2 bg-[#181818] border border-white/[0.06] rounded-full px-4 py-2.5 max-w-[300px] text-spotify-text text-[13.5px]">
+                            <i class="ph-bold ph-magnifying-glass"></i> O que você quer ouvir?
+                        </div>
+                    </div>
+
+                    <div class="card c-span-2 reveal">
+                        <div class="ic"><i class="ph-bold ph-books"></i></div>
+                        <h3 class="font-[700] text-[19px]">Sua biblioteca</h3>
+                        <p class="text-spotify-text text-[14px] leading-relaxed">Playlists, artistas que você segue e faixas curtidas, organizados num só lugar, com edição em dois toques.</p>
+                    </div>
+
+                    <div class="card c-span-2 reveal">
+                        <div class="ic"><i class="ph-bold ph-list-numbers"></i></div>
+                        <h3 class="font-[700] text-[19px]">Fila inteligente</h3>
+                        <p class="text-spotify-text text-[14px] leading-relaxed">Arraste pra reordenar, escolha "tocar em seguida" em qualquer faixa e continue de onde parou.</p>
+                    </div>
+
+                    <div class="card c-span-2 reveal">
+                        <div class="ic"><i class="ph-bold ph-text-aa"></i></div>
+                        <h3 class="font-[700] text-[19px]">Letras na tela</h3>
+                        <p class="text-spotify-text text-[14px] leading-relaxed">Acompanhe a letra da música tocando, sem sair do player nem trocar de aba.</p>
+                    </div>
+
+                    <div class="card c-span-2 reveal">
+                        <div class="ic"><i class="ph-bold ph-cloud-check"></i></div>
+                        <h3 class="font-[700] text-[19px]">Sincronização na nuvem</h3>
+                        <p class="text-spotify-text text-[14px] leading-relaxed">Sua biblioteca te acompanha: comece a ouvir no computador, continue de onde parou no celular.</p>
+                    </div>
+
+                    <div class="card c-span-2 reveal">
+                        <div class="ic"><i class="ph-bold ph-palette"></i></div>
+                        <h3 class="font-[700] text-[19px]">Temas</h3>
+                        <p class="text-spotify-text text-[14px] leading-relaxed mb-1">Dark, Blue, Green ou Wine — escolha o clima da sua biblioteca.</p>
+                        <div class="flex gap-2 mt-auto">
+                            <span class="w-5 h-5 rounded-full bg-[#121212] border border-white/30"></span>
+                            <span class="w-5 h-5 rounded-full bg-[#0f172a] border border-white/10"></span>
+                            <span class="w-5 h-5 rounded-full bg-[#022c22] border border-white/10"></span>
+                            <span class="w-5 h-5 rounded-full bg-[#2c0909] border border-white/10"></span>
+                        </div>
+                    </div>
+
+                    <div class="card c-span-2 reveal">
+                        <div class="ic"><i class="ph-bold ph-screencast"></i></div>
+                        <h3 class="font-[700] text-[19px]">Transmita pra TV</h3>
+                        <p class="text-spotify-text text-[14px] leading-relaxed">Envie a música pra TV ou caixa de som via Cast ou AirPlay, sem cabo e sem sair da faixa.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ GESTOS ============ -->
+        <section id="gestos" class="border-t border-white/[0.08] py-20 md:py-24">
+            <div class="max-w-[1180px] mx-auto px-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-14 items-center">
+                    <div class="order-2 md:order-1 reveal">
+                        <span class="eyebrow">Feito pra tocar</span>
+                        <h2 class="font-[800] text-[30px] md:text-[40px] tracking-tight mt-4 mb-3">Controle a música com as mãos.</h2>
+                        <p class="text-spotify-text text-[16px] mb-8 max-w-[440px]">No celular, cada gesto tem uma função — sem precisar caçar botão pequeno.</p>
+
+                        <div class="flex flex-col">
+                            <div class="gesture-row">
+                                <div class="ic shrink-0"><i class="ph-bold ph-arrows-left-right"></i></div>
+                                <div>
+                                    <h3 class="font-[700] text-[15.5px] text-white mb-1">Deslize</h3>
+                                    <p class="text-spotify-text text-[14px]">Deslize a capa do álbum pra esquerda ou direita e pule pra próxima faixa ou volte pra anterior.</p>
+                                </div>
+                            </div>
+                            <div class="gesture-row">
+                                <div class="ic shrink-0"><i class="ph-bold ph-timer"></i></div>
+                                <div>
+                                    <h3 class="font-[700] text-[15.5px] text-white mb-1">Toque e segure</h3>
+                                    <p class="text-spotify-text text-[14px]">Toque e segure numa faixa pra curtir, tocar em seguida, adicionar à playlist ou transmitir na hora.</p>
+                                </div>
+                            </div>
+                            <div class="gesture-row">
+                                <div class="ic shrink-0"><i class="ph-bold ph-dots-six-vertical"></i></div>
+                                <div>
+                                    <h3 class="font-[700] text-[15.5px] text-white mb-1">Arraste</h3>
+                                    <p class="text-spotify-text text-[14px]">Arraste os itens da fila pra reorganizar a ordem exata que você quer ouvir.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="font-mono text-[12px] text-spotify-text mt-6">No computador, o clique com o botão direito faz o mesmo que o toque longo.</p>
+                    </div>
+
+                    <div class="order-1 md:order-2 reveal">
+                        <div class="phone">
+                            <div class="phone-screen">
+                                <div class="phone-art">
+                                    <i class="ph-fill ph-music-notes"></i>
+                                    <div class="swipe-hint"></div>
+                                </div>
+                                <div class="press-ring"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ COMO FUNCIONA ============ -->
+        <section id="como-funciona" class="border-t border-white/[0.08] py-20 md:py-24">
+            <div class="max-w-[1180px] mx-auto px-6">
+                <div class="max-w-[620px] mb-12 reveal">
+                    <span class="eyebrow">Como funciona</span>
+                    <h2 class="font-[800] text-[30px] md:text-[42px] tracking-tight mt-4">Três passos. Nenhuma fricção.</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+                    <div class="reveal">
+                        <div class="w-11 h-11 rounded-full flex items-center justify-center font-mono text-[13px] font-bold text-spotify-green mb-5" style="background:var(--accent-dim); border:1px solid #0c3a1f;">01</div>
+                        <h3 class="font-[700] text-[19px] mb-2">Busque</h3>
+                        <p class="text-spotify-text text-[14.5px] max-w-[280px]">Digite o nome da música, artista ou álbum e veja os resultados aparecerem em tempo real.</p>
+                    </div>
+                    <div class="reveal">
+                        <div class="w-11 h-11 rounded-full flex items-center justify-center font-mono text-[13px] font-bold text-spotify-green mb-5" style="background:var(--accent-dim); border:1px solid #0c3a1f;">02</div>
+                        <h3 class="font-[700] text-[19px] mb-2">Organize</h3>
+                        <p class="text-spotify-text text-[14.5px] max-w-[280px]">Salve em playlists, siga artistas e monte sua fila do jeito que você quiser ouvir.</p>
+                    </div>
+                    <div class="reveal">
+                        <div class="w-11 h-11 rounded-full flex items-center justify-center font-mono text-[13px] font-bold text-spotify-green mb-5" style="background:var(--accent-dim); border:1px solid #0c3a1f;">03</div>
+                        <h3 class="font-[700] text-[19px] mb-2">Ouça</h3>
+                        <p class="text-spotify-text text-[14.5px] max-w-[280px]">No computador, no celular ou instalado como app — uma faixa direto na outra, sem interrupção.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ ATALHOS ============ -->
+        <section class="border-t border-white/[0.08] py-20 md:py-24">
+            <div class="max-w-[1180px] mx-auto px-6">
+                <div class="max-w-[620px] mb-10 reveal">
+                    <span class="eyebrow">Pra quem gosta de velocidade</span>
+                    <h2 class="font-[800] text-[30px] md:text-[40px] tracking-tight mt-4 mb-3">Feito pra teclado também.</h2>
+                    <p class="text-spotify-text text-[16px]">Toda ação essencial tem um atalho — pressione <span class="kk">?</span> dentro do Exlify pra ver a lista completa a qualquer momento.</p>
+                </div>
+
+                <div class="bg-[#121212] border border-white/[0.08] rounded-2xl p-6 md:p-9 grid grid-cols-1 md:grid-cols-2 gap-x-10 reveal">
+                    <div>
+                        <div class="sc-row"><span>Reproduzir / Pausar</span><span class="kk">Espaço</span></div>
+                        <div class="sc-row"><span>Próxima faixa</span><span class="kk">Shift + →</span></div>
+                        <div class="sc-row"><span>Faixa anterior</span><span class="kk">Shift + ←</span></div>
+                        <div class="sc-row"><span>Volume</span><span class="kk">↑ / ↓</span></div>
+                    </div>
+                    <div>
+                        <div class="sc-row"><span>Mudo</span><span class="kk">M</span></div>
+                        <div class="sc-row"><span>Aleatório</span><span class="kk">S</span></div>
+                        <div class="sc-row"><span>Repetir</span><span class="kk">R</span></div>
+                        <div class="sc-row"><span>Curtir faixa atual</span><span class="kk">L</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ PLATAFORMAS ============ -->
+        <section id="plataformas" class="border-t border-white/[0.08] py-20 md:py-24">
+            <div class="max-w-[1180px] mx-auto px-6">
+                <div class="max-w-[620px] mb-12 reveal">
+                    <span class="eyebrow">Onde você quiser</span>
+                    <h2 class="font-[800] text-[30px] md:text-[42px] tracking-tight mt-4">Computador, celular — e instalado como app.</h2>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="card reveal">
+                        <div class="ic"><i class="ph-bold ph-desktop"></i></div>
+                        <h3 class="font-[700] text-[16px]">Navegador desktop</h3>
+                        <p class="text-spotify-text text-[13.5px] leading-relaxed">Todos os atalhos de teclado e a fila lado a lado, sem instalar nada.</p>
+                    </div>
+                    <div class="card reveal">
+                        <div class="ic"><i class="ph-bold ph-device-mobile"></i></div>
+                        <h3 class="font-[700] text-[16px]">Navegador mobile</h3>
+                        <p class="text-spotify-text text-[13.5px] leading-relaxed">Player em tela cheia, gestos de deslizar e toque longo prontos pra usar.</p>
+                    </div>
+                    <div class="card reveal">
+                        <div class="ic"><i class="ph-bold ph-arrow-square-down"></i></div>
+                        <h3 class="font-[700] text-[16px]">Instalável como app</h3>
+                        <p class="text-spotify-text text-[13.5px] leading-relaxed">Adicione à tela inicial e abra sem barra de navegador, como um app nativo.</p>
+                    </div>
+                    <div class="card reveal">
+                        <div class="ic"><i class="ph-bold ph-screencast"></i></div>
+                        <h3 class="font-[700] text-[16px]">Cast &amp; AirPlay</h3>
+                        <p class="text-spotify-text text-[13.5px] leading-relaxed">Transmita pra TV ou caixa de som conectada em dois toques.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ CLOSING CTA ============ -->
+        <section class="border-t border-white/[0.08] py-24 md:py-28 text-center">
+            <div class="max-w-[1180px] mx-auto px-6 reveal">
+                <span class="eyebrow">Pronto?</span>
+                <h2 class="font-[800] text-[34px] md:text-[56px] tracking-tight max-w-[760px] mx-auto mt-5 mb-8 leading-[1.05]">
+                    Sua próxima música está <span class="text-spotify-green">a um clique.</span>
+                </h2>
+                <a href="index.html" class="inline-flex items-center gap-2 bg-spotify-green hover:bg-spotify-greenHover text-black font-bold text-[15px] px-8 py-4 rounded-full transition hover:-translate-y-0.5 hover:scale-[1.02]">
+                    <i class="ph-fill ph-play"></i> Abrir o Exlify agora
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="border-t border-white/[0.08] py-10">
+        <div class="max-w-[1180px] mx-auto px-6 flex flex-wrap items-center justify-between gap-5">
+            <img src="logo2.png" alt="Exlify" class="h-[22px]">
+            <div class="flex gap-6 text-[13.5px] text-spotify-text">
+                <a href="index.html" class="hover:text-white transition">Abrir o app</a>
+                <a href="#recursos" class="hover:text-white transition">Recursos</a>
+                <a href="#gestos" class="hover:text-white transition">Gestos</a>
+                <a href="#plataformas" class="hover:text-white transition">Plataformas</a>
+            </div>
+            <span class="text-[12.5px] text-[#555]">Exlify — sua plataforma de música.</span>
+        </div>
+    </footer>
+
+<script>
+    // Barra sonora contínua (seção "sem interrupções")
+    (function(){
+        const strip = document.getElementById('waveStrip');
+        const N = 60;
+        let html = '';
+        for (let r = 0; r < 2; r++) { // duplicado pra loop infinito perfeito
+            for (let i = 0; i < N; i++) {
+                const h = 6 + Math.round(Math.random() * 46);
+                html += `<i style="height:${h}px"></i>`;
+            }
+        }
+        strip.innerHTML = html;
+    })();
+
+    // Menu mobile
+    document.getElementById('menuBtn').addEventListener('click', () => {
+        const menu = document.getElementById('mobileMenu');
+        menu.classList.toggle('hidden');
+    });
+    document.querySelectorAll('#mobileMenu a').forEach(a => {
+        a.addEventListener('click', () => document.getElementById('mobileMenu').classList.add('hidden'));
+    });
+
+    // Scroll reveal
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!prefersReduced && 'IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach((entry, i) => {
+                if (entry.isIntersecting) {
+                    setTimeout(() => entry.target.classList.add('in'), i * 50);
+                    io.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15 });
+        document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+    } else {
+        document.querySelectorAll('.reveal').forEach(el => el.classList.add('in'));
+    }
+</script>
+</body>
+</html>

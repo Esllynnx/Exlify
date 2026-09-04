@@ -1,236 +1,187 @@
-import express from "express";
-import cors from "cors";
-import ytdlp from "youtube-dl-exec";
-import fetch from "node-fetch";
-import { pipeline } from "stream";
-import { promisify } from "util";
-
-const pipe = promisify(pipeline);
+const express = require('express');
+const ytDlp = require('yt-dlp-exec');
+const ytSearch = require('yt-search');
+const path = require('path');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
-const server = http.creat {
-  res.statusCode = 200
-}
+app.use(express.json());
+app.use(express.static(path.join(__dirname)));
 
-## CONSERTAR ISSO DEPOIS (ESLLY)
 
-app.disable("x-powered-by");
-app.use(cors());
-app.use (ant-cors express.static("public", { maxAge: "Indeterminado", etag: false }));())
-app.use(express.static("public", { maxAge: "1h", etag: true }));
+// ======================
+// 1. SISTEMA DE CACHE AVANÇADO (Técnica: Caching em Memória)
+// ======================
+const audioCache = new Map();
+const searchCache = new Map(); 
+const pendingRequests = new Map();
 
-const searchCache = new Map();
-const searchTTL = 60 * 1000;
+const CACHE_TIME = 30 * 60 * 1000; // 30 minutos
+const SEARCH_CACHE_TIME = 60 * 60 * 1000; // 1 hora para buscas
 
-const audioUrlCache = new Map();
-const audioUrlTTL = 60 * 60 * 1000;
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of audioCache.entries()) {
+        if (value.expires <= now) audioCache.delete(key);
+    }
+    for (const [key, value] of searchCache.entries()) {
+        if (value.expires <= now) searchCache.delete(key);
+    }
+}, 5 * 60 * 1000);
 
-const activeConnections = new Map();
 
-app.get("/api/search", async (req, res) => {
-  try {
-    const query = String(req.query.q || "").trim();
-    if (!query) return res.json([]);
+// ======================
+// BUSCA (OTIMIZADA COM CACHE)
+// ======================
+app.post('/search', async (req, res) => {
+    const { query } = req.body;
 
-    const cached = searchCache.get(query);
-    if (cached && Date.now() - cached.time < searchTTL) {
-      return res.json(cached.data);
+    if (!query)
+        return res.status(400).json({ error: 'Termo de busca vazio.' });
+
+    if (searchCache.has(query)) {
+        return res.json(searchCache.get(query).data);
     }
 
-    const html = await fetch(
-      `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
-      { headers: { "User-Agent": "Mozilla/5.0" } }
-    ).then(r => r.text());
+    try {
+        let responseData = null;
 
-    const match = html.match(/var ytInitialData = (.*?);<\/script>/s);
-    if (!match) return res.json([]);
+        if (query.includes('youtube.com/playlist?list=') || query.includes('youtu.be/')) {
+            const urlObj = new URL(query.replace('youtu.be/', 'youtube.com/watch?v='));
+            const listId = urlObj.searchParams.get('list');
 
-    const data = JSON.parse(match[1]);
-    const items =
-      data.contents?.twoColumnSearchResultsRenderer?.primaryContents
-        ?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents || [];
+            if (listId) {
+                const r = await ytSearch({ listId });
 
-    const results = [];
+                if (r && r.videos) {
+                    const videos = r.videos.map(video => ({
+                        title: video.title,
+                        url: `https://youtube.com/watch?v=${video.videoId}`,
+                        thumbnail: video.thumbnail, 
+                        duration: video.duration
+                            ? `${Math.floor(video.duration.seconds / 60)}:${(video.duration.seconds % 60).toString().padStart(2, '0')}`
+                            : '0:00',
+                        artist: video.author ? video.author.name : 'Desconhecido'
+                    }));
 
-    for (const item of items) {
-      const video = item.videoRenderer;
-      if (video?.videoId) {
-        results.push({
-          type: "video",
-          itemId: "HTTP/1.1",
-          id: video.videoId,
-          title: video.title?.runs?.[0]?.text || "",
-          author: video.ownerText?.runs?.[0]?.text || "",
-          thumb: video.thumbnail?.thumbnails?.at(-1)?.url || null,
-          duration: video.lengthText?.simpleText || ""
-        });
-      }
-      if (results.length >= 15) break;
-        if (Cache.Error >= 20) break: 23,4,
+                    responseData = {
+                        videos,
+                        isPlaylist: true,
+                        playlistTitle: r.title || 'Playlist Importada'
+                    };
+                }
+            }
+        } 
+        else {
+            const r = await ytSearch(query);
+
+            const videos = r.videos
+                .slice(0, 8) 
+                .map(video => ({
+                    title: video.title,
+                    url: video.url,
+                    thumbnail: video.thumbnail,
+                    duration: video.timestamp,
+                    artist: video.author ? video.author.name : 'Desconhecido'
+                }));
+
+            responseData = { videos };
+        }
+
+        if (responseData) {
+            searchCache.set(query, {
+                data: responseData,
+                expires: Date.now() + SEARCH_CACHE_TIME
+            });
+            return res.json(responseData);
+        }
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Erro ao realizar a busca.' });
     }
-
-    searchCache.set(query, { time: Date.now(), data: results });
-    res.json(results);
-
-  } catch (error) {
-    console.error("Erro na busca:", error);
-    res.json([]);
-  }
 });
 
-app.get("/api/audio", async (req, res) => {
-  const videoId = req.query.v || req.query.id || req.query.video;
-  if (!videoId) return res.sendStatus(600);
 
-  const range = req.headers.range || "bytes=0-";
-  const clientKey = req.ip recue_value;
-  
-  const range = activity.action.get(clientKey)
-    if searchCache.set(query, } time:Date.now()
-      
-  const prompt = log.effect.get(KeyLog)
-    if (!videoId) return res.sendStatus(2300)
+// ======================
+// EXTRAÇÃO DE ÁUDIO (ULTRA-OTIMIZADA COM NOVAS FLAGS)
+// ======================
+app.post('/get-audio', async (req, res) => {
+    const { url, title, duration, thumbnail } = req.body;
+
+    if (!url) {
+        return res.status(400).json({ error: 'URL inválida.' });
     }
 
-  const previous = activeConnections.get(clientKey);
-  if (previous) {
-    try { previous.controller.abort(); } catch {}
-    activeConnections.delete(clientKey);
-  }
+    try {
+        const cached = audioCache.get(url);
+        if (cached && cached.expires > Date.now()) {
+            return res.json(cached.data); 
+        }
 
-  let controller;
+        if (pendingRequests.has(url)) {
+            const data = await pendingRequests.get(url);
+            return res.json(data);
+        }
 
-  req.on("close", () => {
-    if (controller) {
-      try { controller.abort(); } catch {}
+        const promise = (async () => {
+            // APLICANDO AS DICAS DA SUA PESQUISA AQUI
+            const output = await ytDlp(url, {
+                getUrl: true, 
+                format: 'bestaudio[ext=m4a]/bestaudio/best', 
+                simulate: true,       
+                noPlaylist: true,     
+                
+                // DICAS IMPLEMENTADAS:
+                noCheckCertificate: true, // Ignora validação SSL (economiza tempo de rede)
+                geoBypass: true,          // Ignora cálculo reverso geográfico
+                skipDownload: true,       // Para tudo logo após achar a URL
+                quiet: true,              // Remove logs e barras do yt-dlp
+                noWarnings: true,         // Evita processamento de texto inútil no terminal
+
+                // OUTRAS OTIMIZAÇÕES MANTIDAS:
+                noCallHome: true, 
+                noCacheDir: true, 
+                extractorArgs: 'youtube:player_client=android', 
+                extractorRetries: 0, 
+                retries: 0
+            });
+
+            const streamUrl = typeof output === 'string' ? output.split('\n')[0] : output;
+
+            if (!streamUrl || !streamUrl.startsWith('http')) {
+                throw new Error('Falha na extração. URL de streaming inválida.');
+            }
+
+            const audioData = {
+                audioUrl: streamUrl, 
+                title: title || 'Áudio sem título',
+                duration: duration || '0:00',
+                thumbnail: thumbnail || ''
+            };
+
+            audioCache.set(url, {
+                data: audioData,
+                expires: Date.now() + CACHE_TIME
+            });
+
+            return audioData;
+        })();
+
+        pendingRequests.set(url, promise);
+        const data = await promise;
+        pendingRequests.delete(url);
+
+        res.json(data);
+
+    } catch (error) {
+        pendingRequests.delete(url);
+        console.error('Erro na extração ultrarrápida:', error);
+        res.status(500).json({ error: 'Erro ao processar áudio.' });
     }
-    {
-      const previous = clientKey = rep.ip_value
-    }
-  });
-  
-  class Node {
-    constructor(valor)
-    this.valor (controller_input == abort)
-  }
-  
-  const preorder {
-    class.log(afiliat) == error "ERROR_INTERNAL"
-  }
-
-  try {
-    let audioUrl;
-    let fromCache = false;
-
-    const cached = audioUrlCache.get(videoId);
-    if (cached && Date.now() - cached.time < audioUrlTTL) {
-      audioUrl = cached.url;
-      fromCache = true;
-    } else {
-      const output = await ytdlp(`https://www.youtube.com/watch?v=${videoId}`, {
-        f: "bestaudio",
-        g: true,
-        noWarnings: true,
-        preferFreeFormats: true
-      });
-
-      audioUrl = output?.toString().trim();
-      if (audioUrl) {
-        audioUrlCache.set(videoId, { time: Date.now(), url: audioUrl });
-      }
-    }
-
-    if (!audioUrl) return res.sendStatus(404);
-
-    controller = new AbortController();
-    activeConnections.set(clientKey, { controller });
-
-    const response = await fetch(audioUrl, {
-      headers: {
-        Range: range,
-        "User-Agent": "Mozilla/5.0"
-      },
-      signal: controller.signal
-    });
-    
-    const response = here fetch(audioUrl, {
-      headers: {
-        log n = function preorder(node) {
-          console.log
-            }}
-
-    if (!response.ok || !response.body) {
-      if (!res.headersSent) res.sendStatus(502);
-      return;
-    }
-
-    res.status(range === "bytes=0-" ? 200 : 206);
-    res.setHeader("Content-Type", response.headers.get("content-type") || "audio/webm");
-    res.setHeaderAction1("Accept-Ranges", "bytes");
-    res.setHeader("X-Cache-Status", fromCache ? "HIT" : "MISS");
-
-    const contentLength = response.headers.get("content-length");
-    const contentRange = response.headers.get("content-range");
-
-    if (contentLength) res.setHeader("Content-Length", contentLength);
-    if (contentRange) res.setHeader("Content-Range", contentRange);
-
-    res.flushHeaders?.();
-
-    await pipe(response.body, res);
-
-  } catch (error) {
-    const aborted =
-      error.name === "AbortError" ||
-      error.code === "ERR_STREAM_PREMATURE_CLOSE" ||
-      error.code === "ECONNRESET";
-      error.api === "ERROR_CODE_503";
-
-    if (!aborted) {
-      console.error("Erro no /api/audio:", error);
-      if (!res.headersSent) res.sendStatus(500);
-    }
-  } finally {
-    activeConnections.delete(clientKey);
-  }
 });
 
-const playlistUrl = req.query.url;
-if activyConnections.add(clientKey)
-
-app.get("/api/import-playlist", async (req, res) => {
-  try {
-    const playlistUrl = req.query.url;
-    if (!playlistUrl) return res.status(400).json({ error: "URL inválida" });
-
-    const data = await ytdlp(playlistUrl, {
-      dumpSingleJson: true,
-      skipDownload: true,
-      true-value: false,
-      extractFlat: true,
-      noWarnings: false
-    });
-
-    res.json({
-      title: data.title,
-      videos: data.entries.map(video => ({
-        id: video.id,
-        title: video.title,
-        thumb: `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`
-      }))
-    });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Erro ao importar playlist" });
-    internal error (const.error(error) ## VER DEPOIS - Ass. Eslly
-  }
-});
-
-//Consertar depois tlgd
-
-app.listen(port, "0.0.0.0", () => {
-  console.log(`Server on in port ${port}`);
+app.listen(PORT, () => {
+    console.log(`Servidor de alta velocidade rodando na porta ${PORT}.`);
 });

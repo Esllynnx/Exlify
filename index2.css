@@ -1,0 +1,347 @@
+/*
+    index2.css
+    ----------
+    Estilos novos ou ajustes visuais pedidos depois da versão base do index.html.
+    Carregado depois do CSS principal, então qualquer regra aqui tem prioridade
+    (em caso de empate de especificidade) sobre o que já existia.
+
+    Regra: se um dia quiser tirar algum ajuste daqui, é só apagar o bloco
+    correspondente (procure pelo comentário "MUDANÇA:" acima de cada um).
+*/
+
+/* MUDANÇA: conserta o ícone da lupa (e outros ícones) desalinhados — incluindo
+   um resto do problema que a correção anterior deixou passar.
+   O index.html reduz todo ícone ~5% com "transform: scale(0.95)" nessa mesma
+   regra "i[class*='ph-']". O problema: alguns ícones (a lupa da busca, os
+   triângulos de play) TAMBÉM precisam de um "transform: translateY/X(...)"
+   pra ficar centralizados/alinhados — e como "transform" só aceita UM valor
+   por vez, o scale sempre vencia e apagava esse deslocamento, deixando a
+   lupa torta (era exatamente o ícone da screenshot que você mandou).
+   A correção usa a propriedade "scale" separada (não é a mesma coisa que
+   "transform: scale()") pra reduzir o ícone sem mexer no "transform" —
+   só que aí é preciso reaplicar manualmente o translate que cada ícone
+   específico precisava, porque zerar "transform" também apaga esses. */
+i[class*="ph-"] {
+    transform: none !important;
+    scale: 0.95;
+}
+/* Ícones que dependem de translateY(-50%) pra ficar centralizados verticalmente
+   (ex: a lupa dentro da barra de busca) */
+i[class*="ph-"][class*="-translate-y-1/2"] { transform: translateY(-50%) !important; }
+/* Botões de play que usam um nudge de 1-2px pro triângulo parecer centralizado
+   de verdade (o olho humano percebe o triângulo como "torto" sem isso) */
+i[class*="ph-"][class*="translate-x-[1px]"] { transform: translateX(1px) !important; }
+i[class*="ph-"][class*="translate-x-[2px]"] { transform: translateX(2px) !important; }
+
+/* MUDANÇA: barra de redimensionar as colunas laterais — por padrão fica bem fina
+   (quase sem ocupar espaço visualmente) e só "engorda" com uma linha visível
+   quando o usuário passa o cursor por cima, indicando que dá pra arrastar. */
+.resizer-left, .resizer-right {
+    width: 2px !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    position: relative;
+}
+.resizer-left::before, .resizer-right::before {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    left: -5px; right: -5px;
+    cursor: col-resize;
+}
+.resizer-left:hover, .resizer-left.active,
+.resizer-right:hover, .resizer-right.active {
+    width: 3px !important;
+    background: #1ed760 !important;
+}
+
+/* MUDANÇA: janela flutuante (Now Playing) — pode ficar bem menor, e todos os
+   botões (anterior/play/próxima, barra de progresso) continuam visíveis em
+   qualquer tamanho ou proporção, retrato ou paisagem. Usa container queries:
+   o layout interno reage ao tamanho da PRÓPRIA janela, não da tela toda. */
+#nowPlayingCard {
+    min-width: 170px !important;
+    min-height: 190px !important;
+    max-width: 640px !important;
+    max-height: 800px !important;
+    container-type: size;
+    container-name: npc;
+}
+#nowPlayingCard .npc-body {
+    padding: clamp(8px, 4%, 20px);
+    gap: clamp(4px, 3%, 16px);
+}
+#nowPlayingCard #npcThumb {
+    width: auto;
+    max-width: min(220px, 55%);
+}
+@container npc (max-width: 240px) {
+    #nowPlayingCard #npcThumb { max-width: 44%; margin-bottom: 6px !important; }
+    #nowPlayingCard #npcTitle { font-size: 12px !important; }
+    #nowPlayingCard #npcArtist { font-size: 11px !important; margin-bottom: 8px !important; }
+    #nowPlayingCard .npc-body .flex.items-center.gap-6 { gap: 10px !important; }
+    #nowPlayingCard .npc-body button.w-11 { width: 34px !important; height: 34px !important; }
+}
+@container npc (max-height: 240px) {
+    #nowPlayingCard #npcThumb { max-width: 30%; margin-bottom: 0 !important; }
+    #nowPlayingCard .npc-body { padding: 6px 12px; }
+    #nowPlayingCard #npcTitle, #nowPlayingCard #npcArtist { margin-bottom: 2px !important; }
+}
+@container npc (max-height: 150px) {
+    #nowPlayingCard .npc-body { flex-direction: row !important; align-items: center; }
+    #nowPlayingCard #npcThumb { max-width: 60px !important; }
+    #nowPlayingCard .npc-info { flex-direction: row !important; align-items: center; gap: 12px; flex-wrap: nowrap; }
+    #nowPlayingCard #npcTitle, #nowPlayingCard #npcArtist { display: none; }
+}
+#nowPlayingCard::after {
+    content: '';
+    position: absolute;
+    right: 3px; bottom: 3px;
+    width: 12px; height: 12px;
+    background:
+        linear-gradient(135deg, transparent 0 40%, rgba(255,255,255,.5) 40% 46%, transparent 46% 60%, rgba(255,255,255,.5) 60% 66%, transparent 66% 100%);
+    opacity: 0;
+    transition: opacity .15s ease;
+    pointer-events: none;
+}
+#nowPlayingCard:hover::after { opacity: 1; }
+
+/* MUDANÇA: responsividade do conteúdo do meio em telas bem grandes — o container
+   principal e as grades de cards (playlists, resultados, recomendações) usam
+   mais do espaço disponível em vez de ficar travado numa largura fixa. */
+@media (min-width: 1600px) {
+    #viewContainer, .max-w-\[1500px\] {
+        max-width: min(94vw, 2000px) !important;
+    }
+    .xl\:grid-cols-6, .xl\:grid-cols-5, .lg\:grid-cols-5 {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+    }
+}
+@media (min-width: 2000px) {
+    #viewContainer, .max-w-\[1500px\] {
+        max-width: min(92vw, 2400px) !important;
+    }
+}
+
+/* MUDANÇA: mensagem de "busca sem resultado / erro" (usada pelo index2.js) */
+.search-empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 64px 16px; gap: 12px;
+}
+.search-empty-state i { font-size: 48px; color: rgba(255,255,255,.25); }
+.search-empty-state h3 { color: #fff; font-weight: 800; font-size: 20px; }
+.search-empty-state p { color: #b3b3b3; font-size: 14px; max-width: 380px; }
+.search-empty-state button {
+    margin-top: 8px; background: #1ed760; color: #000; font-weight: 700;
+    padding: 10px 24px; border-radius: 999px; transition: transform .15s;
+}
+.search-empty-state button:hover { transform: scale(1.05); }
+
+/* =============================================================================
+   MUDANÇA: Home nova — efeitos visuais pra deixar a tela inicial "de streaming
+   de verdade" em vez do visual mais cru/frio de antes: blobs animados atrás da
+   saudação, cartão de "novidades e dicas" do app, brilho/shine nos cards de
+   mix, e chips de gênero mais bonitos. Tudo isso é usado pelo renderHome()
+   novo do index2.js. (As classes .fade-in-stagger, .card-hover-lift e
+   .skeleton-shimmer já existiam no index.html — só passaram a ser usadas.)
+   ========================================================================== */
+
+/* --- Saudação com blobs de fundo animados (efeito "vivo", sutil) --- */
+.home-hero-wrap {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+}
+.home-hero-blob {
+    position: absolute;
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    filter: blur(70px);
+    opacity: .32;
+    pointer-events: none;
+    z-index: 0;
+    animation: homeBlobDrift 16s ease-in-out infinite alternate;
+}
+.home-hero-blob.b1 { background: #1ed760; top: -90px; left: -50px; }
+.home-hero-blob.b2 { background: #509bf5; top: -70px; right: -70px; animation-delay: -7s; }
+@keyframes homeBlobDrift {
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(18px, 22px) scale(1.18); }
+}
+
+/* --- Cartão "Novidades & dicas" (mensagens do próprio app) --- */
+.home-tips-card {
+    background: linear-gradient(135deg, rgba(30,215,96,0.10), rgba(80,155,245,0.07));
+    border: 1px solid rgba(255,255,255,0.07);
+    backdrop-filter: blur(6px);
+}
+.home-tip-fade { animation: homeTipFade .35s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes homeTipFade { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: translateX(0); } }
+.home-tip-icon { animation: homeTipFloat 3s ease-in-out infinite; }
+@keyframes homeTipFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.home-tip-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    cursor: pointer;
+    transition: background .2s ease, transform .2s ease;
+    display: inline-block;
+}
+.home-tip-dot.active { background: #1ed760; transform: scale(1.35); }
+
+/* --- Chips de gênero/humor (mais "premium" que a pill lisa de antes) --- */
+.home-chip {
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: background .2s ease, border-color .2s ease, transform .15s ease;
+}
+.home-chip:hover { background: rgba(30,215,96,0.14); border-color: rgba(30,215,96,0.4); transform: translateY(-1px); }
+
+/* --- Cards de "Seus Mixes": tinta de gradiente + brilho diagonal ao passar o mouse --- */
+.home-mix-card { position: relative; isolation: isolate; }
+.home-mix-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(120deg, rgba(30,215,96,0.18), rgba(80,155,245,0.10) 45%, transparent 70%);
+    opacity: 0;
+    transition: opacity .3s ease;
+    pointer-events: none;
+}
+.home-mix-card:hover::before { opacity: 1; }
+.home-mix-card::after {
+    content: '';
+    position: absolute; top: 0; left: -60%;
+    width: 35%; height: 100%;
+    background: linear-gradient(115deg, transparent, rgba(255,255,255,0.14), transparent);
+    transform: skewX(-20deg);
+    transition: left .6s ease;
+    pointer-events: none;
+}
+.home-mix-card:hover::after { left: 130%; }
+
+/* Respeita configuração de "reduzir movimento" do próprio app/SO */
+@media (prefers-reduced-motion: reduce) {
+    .home-hero-blob, .home-tip-icon { animation: none !important; }
+}
+
+/* =============================================================================
+   MUDANÇA: pacote de otimização/responsividade/polimento pedido depois da
+   última leva de mudanças na Home. Cobre: foto de perfil "bugada" no header,
+   conteúdo do meio responsivo à Visualização de Reprodução (barra direita)
+   aberta/fechada, janela flutuante respondendo a QUALQUER tamanho, nome de
+   playlist sem "...", e pequenas animações de interação.
+   ========================================================================== */
+
+/* --- Foto de perfil do header: ícone e imagem empilhados um sobre o outro
+   (em vez de lado a lado), pra nunca mais aparecer "metade ícone, metade
+   foto" — mesmo se por algum motivo os dois ficarem visíveis ao mesmo tempo,
+   a imagem (que fica por cima) simplesmente cobre o ícone por completo. --- */
+#userProfileBtnHeader { display: block; }
+#userProfileBtnHeader #headerProfileIcon,
+#userProfileBtnHeader #headerProfileImg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+#userProfileBtnHeader #headerProfileIcon.hidden,
+#userProfileBtnHeader #headerProfileImg.hidden { display: none !important; }
+#userProfileBtnHeader #headerProfileImg { z-index: 2; object-fit: cover; }
+#userProfileBtnHeader #headerProfileIcon { z-index: 1; }
+
+/* --- Conteúdo do meio (busca, home, playlists, biblioteca) responsivo ao
+   espaço real disponível, não só ao tamanho da tela inteira. Sem isso, abrir
+   a "Visualização de Reprodução" (barra direita) espremia as grades de
+   cards, porque elas reagiam à largura da JANELA, não à largura que sobrava
+   de verdade no meio. Agora reagem ao tamanho real do <main>. --- */
+main { container-type: inline-size; container-name: mainContent; }
+
+/* Só mira nas grades de "muitos cards pequenos" (as que chegam a 4-6
+   colunas em telas grandes) — NÃO mexe na grade de 2-3 colunas dos Mixes
+   (cards largos) nem na linha de cabeçalho da lista de faixas (#, Título,
+   Álbum, tempo), que usam grid-template-columns customizado de propósito. */
+@container mainContent (max-width: 1650px) {
+    #viewContainer [class*="xl:grid-cols-6"],
+    #viewContainer [class*="xl:grid-cols-5"] { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+}
+@container mainContent (max-width: 1300px) {
+    #viewContainer [class*="xl:grid-cols-6"],
+    #viewContainer [class*="xl:grid-cols-5"],
+    #viewContainer [class*="lg:grid-cols-5"] { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+}
+@container mainContent (max-width: 1000px) {
+    #viewContainer [class*="xl:grid-cols-6"],
+    #viewContainer [class*="xl:grid-cols-5"],
+    #viewContainer [class*="lg:grid-cols-5"],
+    #viewContainer [class*="lg:grid-cols-4"] { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+@container mainContent (max-width: 720px) {
+    #viewContainer [class*="xl:grid-cols-6"],
+    #viewContainer [class*="xl:grid-cols-5"],
+    #viewContainer [class*="lg:grid-cols-5"],
+    #viewContainer [class*="lg:grid-cols-4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@container mainContent (max-width: 440px) {
+    #viewContainer [class*="xl:grid-cols-6"],
+    #viewContainer [class*="xl:grid-cols-5"],
+    #viewContainer [class*="lg:grid-cols-5"],
+    #viewContainer [class*="lg:grid-cols-4"] { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
+}
+/* O card de "Melhor resultado" da busca também reage ao espaço real —
+   evita ele ficar apertado quando a barra direita tá aberta numa tela média */
+@container mainContent (max-width: 900px) {
+    #viewContainer .xl\:w-\[40\%\] { width: 100% !important; }
+    #viewContainer .xl\:flex-row { flex-direction: column !important; }
+}
+
+/* --- Janela "Tocando Agora" flutuante: mais faixas de tamanho pra cobrir
+   QUALQUER proporção que o usuário arraste, seja dentro da página ou numa
+   janela de verdade (Picture-in-Picture) — de um selinho quadrado até uma
+   janela enorme, retrato ou paisagem. --- */
+@container npc (max-width: 200px) {
+    #nowPlayingCard .npc-body button.w-11 { width: 30px !important; height: 30px !important; }
+    #nowPlayingCard .npc-body button.w-11 i { font-size: 13px !important; }
+}
+@container npc (min-width: 500px) {
+    #nowPlayingCard #npcTitle { font-size: 20px !important; }
+    #nowPlayingCard #npcArtist { font-size: 15px !important; }
+    #nowPlayingCard .npc-body button.w-11 { width: 56px !important; height: 56px !important; }
+}
+@container npc (min-width: 500px) and (min-height: 500px) {
+    #nowPlayingCard #npcThumb { max-width: 280px !important; }
+}
+/* Extremos: janela virou uma tira bem fininha (largura OU altura mínima) */
+@container npc (max-width: 190px), npc (max-height: 190px) {
+    #nowPlayingCard .npc-info > *:not(.flex) { margin-bottom: 4px !important; }
+}
+
+/* --- Nome de playlist: título grande encolhe suavemente em vez de cortar
+   com "...". O JS calcula o tamanho ideal; esta transição só deixa a troca
+   de tamanho suave em vez de "pular". --- */
+.playlist-title-fit { transition: font-size .15s ease; white-space: nowrap; overflow: hidden; min-width: 0; }
+
+/* --- Pequenas animações de interação, pra tudo responder ao toque/clique
+   em vez de mudar de estado seco/instantâneo. --- */
+#viewContainer button:active:not(:disabled),
+.home-chip:active,
+nav button:active {
+    transform: scale(0.94);
+}
+.track-row { transition: background-color .15s ease, transform .1s ease; }
+a, button { -webkit-tap-highlight-color: transparent; }
+#rsArtist, #fsArtist, #playingArtist, #mobileArtist {
+    transition: color .15s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+    #viewContainer button:active:not(:disabled), .home-chip:active, nav button:active { transform: none; }
+}
